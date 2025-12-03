@@ -12,7 +12,9 @@ import com.brightcare.patient.data.model.LoginResult
 import com.brightcare.patient.data.model.LoginException
 import com.brightcare.patient.data.model.LoginValidationState
 import com.brightcare.patient.data.model.ProfileCompletionStatus
+import com.brightcare.patient.data.model.FirestoreUserData
 import com.brightcare.patient.ui.component.signup_component.ValidationUtils
+import com.brightcare.patient.utils.DeviceUtils
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
@@ -174,7 +176,30 @@ class PatientLoginRepository(
                                         if (task.isSuccessful) {
                                             val user = task.result?.user
                                             if (user != null) {
-                                                // Facebook accounts verification status is handled by Firebase Auth directly
+                                                // Check if this is a new user and store data if needed
+                                                val isNewUser = task.result?.additionalUserInfo?.isNewUser ?: false
+                                                
+                                                if (isNewUser) {
+                                                    Log.d(TAG, "New Facebook user detected, storing user data")
+                                                    try {
+                                                        val deviceId = DeviceUtils.getDeviceId(context)
+                                                        val userData = FirestoreUserData(
+                                                            email = (user.email ?: "").lowercase(),
+                                                            deviceId = deviceId,
+                                                            createdAt = System.currentTimeMillis(),
+                                                            updatedAt = System.currentTimeMillis()
+                                                        )
+                                                        
+                                                        firestore.collection(FirestoreUserData.COLLECTION_NAME)
+                                                            .document(user.uid)
+                                                            .set(userData)
+                                                        
+                                                        Log.d(TAG, "New Facebook user data stored successfully")
+                                                    } catch (e: Exception) {
+                                                        Log.e(TAG, "Failed to store new Facebook user data", e)
+                                                        // Continue with login even if storage fails
+                                                    }
+                                                }
                                                 
                                                 // Check profile completion in background
                                                 checkProfileCompletionAsync(user) { profileStatus ->
@@ -390,7 +415,31 @@ class PatientLoginRepository(
                         val user = authResult.user
                         
                         if (user != null) {
-                            // Google accounts verification status is handled by Firebase Auth directly
+                            // Check if this is a new user and store data if needed
+                            val isNewUser = authResult.additionalUserInfo?.isNewUser ?: false
+                            
+                            if (isNewUser) {
+                                Log.d(TAG, "New Google user detected, storing user data")
+                                try {
+                                    val deviceId = DeviceUtils.getDeviceId(context)
+                                    val userData = FirestoreUserData(
+                                        email = (user.email ?: "").lowercase(),
+                                        deviceId = deviceId,
+                                        createdAt = System.currentTimeMillis(),
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                    
+                                    firestore.collection(FirestoreUserData.COLLECTION_NAME)
+                                        .document(user.uid)
+                                        .set(userData)
+                                        .await()
+                                    
+                                    Log.d(TAG, "New Google user data stored successfully")
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Failed to store new Google user data", e)
+                                    // Continue with login even if storage fails
+                                }
+                            }
                             
                             // Check profile completion status
                             val profileStatus = checkProfileCompletion(user.uid)

@@ -85,7 +85,7 @@ fun PatientSignUpScreen(
     // Terms/Privacy removed from signup - will be handled in Complete Profile
     
     // Handle navigation based on auth state
-    LaunchedEffect(authState, uiState.isSignUpSuccessful) {
+    LaunchedEffect(authState, uiState.isSignUpSuccessful, uiState.isSocialLoginSuccessful) {
         when (authState) {
             is AuthResult.Success -> {
                 if (uiState.isSignUpSuccessful) {
@@ -101,6 +101,22 @@ fun PatientSignUpScreen(
                     // Email/password signup successful - navigate to login
                     navController.navigateToLogin(clearBackStack = true)
                 } else if (uiState.isSocialLoginSuccessful) {
+                    // Show success toast for social signup
+                    val response = (authState as AuthResult.Success).response
+                    val socialProvider = when (response.providerId) {
+                        "google.com" -> "Google"
+                        "facebook.com" -> "Facebook"
+                        else -> "Social"
+                    }
+                    
+                    toastState.showInfo(
+                        message = "Successfully signed up with $socialProvider! Complete your profile to continue.",
+                        duration = 4000L
+                    )
+                    
+                    // Wait a bit for toast to show before navigating
+                    kotlinx.coroutines.delay(1500)
+                    
                     // Social login successful - navigate to complete profile
                     navController.navigateToCompleteProfile(clearBackStack = true)
                 }

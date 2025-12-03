@@ -288,159 +288,159 @@ class PatientSignUpRepository(
             
             Log.d(TAG, "Starting Facebook Sign-In")
             
-            // Create callback manager
-            val callbackManager = CallbackManager.Factory.create()
-            
             // Use suspendCoroutine to convert callback to suspend function
             kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
                 
-                fun proceedWithFacebookAuth(
-                    credential: com.google.firebase.auth.AuthCredential
-                ) {
-                    firebaseAuth.signInWithCredential(credential)
-                        .addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                val firebaseUser = task.result?.user
-                                if (firebaseUser != null) {
-                                    // Store user data in Firestore for Facebook sign-in
-                                    try {
-                                        val deviceId = DeviceUtils.getDeviceId(context)
-                                        val userData = FirestoreUserData(
-                                            email = (firebaseUser.email ?: "").lowercase(),
-                                            deviceId = deviceId,
-                                            createdAt = System.currentTimeMillis(),
-                                            updatedAt = System.currentTimeMillis()
-                                        )
-                                        
-                                        firestore.collection(FirestoreUserData.COLLECTION_NAME)
-                                            .document(firebaseUser.uid)
-                                            .set(userData)
-                                        
-                                        Log.d(TAG, "Facebook user data stored in Firestore successfully")
-                                    } catch (e: Exception) {
-                                        Log.e(TAG, "Failed to store Facebook user data in Firestore", e)
-                                    }
-                                    
-                                    val response = SignUpResponse(
-                                        userId = firebaseUser.uid,
-                                        email = (firebaseUser.email ?: "").lowercase(),
-                                        isEmailVerified = firebaseUser.isEmailVerified,
-                                        displayName = firebaseUser.displayName,
-                                        photoUrl = firebaseUser.photoUrl?.toString(),
-                                        providerId = "facebook.com"
-                                    )
-                                    
-                                    val successResult = AuthResult.Success(response)
-                                    _authState.value = successResult
-                                    
-                                    Log.d(TAG, "Facebook Sign-In successful: ${response.userId}")
-                                    continuation.resume(successResult) {}
-                                } else {
-                                    val errorResult = AuthResult.Error(AuthException.Unknown("Facebook sign-in failed - no user returned"))
-                                    _authState.value = errorResult
-                                    continuation.resume(errorResult) {}
-                                }
-                            } else {
-                                val exception = task.exception
-                                Log.e(TAG, "Firebase authentication failed", exception)
-                                
-                                val errorResult = if (exception is com.google.firebase.auth.FirebaseAuthUserCollisionException) {
-                                    AuthResult.Error(AuthException.EmailAlreadyInUse)
-                                } else {
-                                    AuthResult.Error(AuthException.Unknown("Firebase authentication failed: ${exception?.message}"))
-                                }
-                                _authState.value = errorResult
-                                continuation.resume(errorResult) {}
-                            }
-                        }
+                // Check if user is already logged in with Facebook
+                val accessToken = AccessToken.getCurrentAccessToken()
+                if (accessToken != null && !accessToken.isExpired) {
+                    Log.d(TAG, "Using existing Facebook access token")
+                    val credential = FacebookAuthProvider.getCredential(accessToken.token)
+                    proceedWithFirebaseAuth(credential, continuation)
+                    return@suspendCancellableCoroutine
                 }
                 
+                // Create callback manager for this session
+                val callbackManager = CallbackManager.Factory.create()
+                
                 LoginManager.getInstance().registerCallback(callbackManager,
-                    object : FacebookCallback<LoginResult> {
-                        override fun onSuccess(result: LoginResult) {
-                            Log.d(TAG, "Facebook login successful, checking for existing email")
+                    object : FacebookCallback<com.facebook.login.LoginResult> {
+                        override fun onSuccess(result: com.facebook.login.LoginResult) {
+                            Log.d(TAG, "Facebook login successful, authenticating with Firebase")
                             
                             val token = result.accessToken
                             val credential = FacebookAuthProvider.getCredential(token.token)
                             
-                            // First check if email is already registered with different provider
-                            // We need to get the email from Facebook first
-                            val graphRequest = GraphRequest.newMeRequest(token) { jsonObject, _ ->
-                                try {
-                                    val email = jsonObject?.optString("email")
-                                    if (!email.isNullOrEmpty()) {
-                                        Log.d(TAG, "Checking if Facebook email exists: $email")
-                                        
-                                        // Check existing sign-in methods
-                                        firebaseAuth.fetchSignInMethodsForEmail(email)
-                                            .addOnCompleteListener { methodsTask ->
-                                                if (methodsTask.isSuccessful) {
-                                                    val signInMethods = methodsTask.result?.signInMethods
-                                                    if (signInMethods?.isNotEmpty() == true) {
-                                                        Log.d(TAG, "Email exists with methods: $signInMethods")
-                                                        
-                                                        if (signInMethods.contains("password") && !signInMethods.contains("facebook.com")) {
-                                                            // Email is registered with email/password but not Facebook
-                                                            val errorResult = AuthResult.Error(AuthException.EmailAlreadyInUse)
-                                                            _authState.value = errorResult
-                                                            continuation.resume(errorResult) {}
-                                                            return@addOnCompleteListener
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                // Proceed with Firebase authentication
-                                                proceedWithFacebookAuth(credential)
-                                            }
-                                    } else {
-                                        // No email from Facebook, proceed anyway
-                                        proceedWithFacebookAuth(credential)
-                                    }
-                                } catch (e: Exception) {
-                                    Log.w(TAG, "Could not get Facebook email, proceeding with sign-in", e)
-                                    proceedWithFacebookAuth(credential)
-                                }
-                            }
-                            
-                            val parameters = android.os.Bundle()
-                            parameters.putString("fields", "email,name")
-                            graphRequest.parameters = parameters
-                            graphRequest.executeAsync()
+                            proceedWithFirebaseAuth(credential, continuation)
                         }
                         
                         override fun onCancel() {
                             Log.d(TAG, "Facebook Sign-In cancelled by user")
-                            val errorResult = AuthResult.Error(AuthException.Unknown("Sign-in cancelled"))
+                            val errorResult = AuthResult.Error(AuthException.Unknown("Facebook sign-in was cancelled"))
                             _authState.value = errorResult
-                            continuation.resume(errorResult) {}
+                            if (continuation.isActive) {
+                                continuation.resume(errorResult) {}
+                            }
                         }
                         
                         override fun onError(error: FacebookException) {
                             Log.e(TAG, "Facebook Sign-In error", error)
                             val errorResult = AuthResult.Error(AuthException.Unknown("Facebook login failed: ${error.message}"))
                             _authState.value = errorResult
-                            continuation.resume(errorResult) {}
+                            if (continuation.isActive) {
+                                continuation.resume(errorResult) {}
+                            }
                         }
                     })
                 
                 // Start Facebook login
-                LoginManager.getInstance().logInWithReadPermissions(
-                    activity,
-                    listOf("email", "public_profile")
-                )
+                try {
+                    LoginManager.getInstance().logInWithReadPermissions(
+                        activity,
+                        listOf("email", "public_profile")
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start Facebook login", e)
+                    val errorResult = AuthResult.Error(AuthException.Unknown("Failed to start Facebook login: ${e.message}"))
+                    _authState.value = errorResult
+                    if (continuation.isActive) {
+                        continuation.resume(errorResult) {}
+                    }
+                }
                 
                 // Handle cancellation
                 continuation.invokeOnCancellation {
+                    Log.d(TAG, "Facebook login cancelled via coroutine cancellation")
                     LoginManager.getInstance().logOut()
                 }
             }
             
         } catch (e: Exception) {
             Log.e(TAG, "Facebook Sign-In error", e)
-            val errorResult = AuthResult.Error(AuthException.NetworkError)
+            val errorResult = AuthResult.Error(AuthException.Unknown("Facebook sign-in failed: ${e.message}"))
             _authState.value = errorResult
             errorResult
         }
+    }
+    
+    /**
+     * Proceed with Firebase authentication using Facebook credential
+     */
+    private fun proceedWithFirebaseAuth(
+        credential: com.google.firebase.auth.AuthCredential,
+        continuation: kotlinx.coroutines.CancellableContinuation<AuthResult>
+    ) {
+        firebaseAuth.signInWithCredential(credential)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val firebaseUser = task.result?.user
+                    if (firebaseUser != null) {
+                        Log.d(TAG, "Firebase authentication successful for Facebook user")
+                        
+                        // Store user data in Firestore for Facebook sign-in
+                        try {
+                            val deviceId = DeviceUtils.getDeviceId(context)
+                            val userData = FirestoreUserData(
+                                email = (firebaseUser.email ?: "").lowercase(),
+                                deviceId = deviceId,
+                                createdAt = System.currentTimeMillis(),
+                                updatedAt = System.currentTimeMillis()
+                            )
+                            
+                            firestore.collection(FirestoreUserData.COLLECTION_NAME)
+                                .document(firebaseUser.uid)
+                                .set(userData)
+                            
+                            Log.d(TAG, "Facebook user data stored in Firestore successfully")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to store Facebook user data in Firestore", e)
+                            // Continue with success even if Firestore storage fails
+                        }
+                        
+                        val response = SignUpResponse(
+                            userId = firebaseUser.uid,
+                            email = (firebaseUser.email ?: "").lowercase(),
+                            isEmailVerified = firebaseUser.isEmailVerified,
+                            displayName = firebaseUser.displayName,
+                            photoUrl = firebaseUser.photoUrl?.toString(),
+                            providerId = "facebook.com"
+                        )
+                        
+                        val successResult = AuthResult.Success(response)
+                        _authState.value = successResult
+                        
+                        Log.d(TAG, "Facebook Sign-In successful: ${response.userId}")
+                        if (continuation.isActive) {
+                            continuation.resume(successResult) {}
+                        }
+                    } else {
+                        val errorResult = AuthResult.Error(AuthException.Unknown("Facebook authentication failed - no user returned"))
+                        _authState.value = errorResult
+                        if (continuation.isActive) {
+                            continuation.resume(errorResult) {}
+                        }
+                    }
+                } else {
+                    val exception = task.exception
+                    Log.e(TAG, "Firebase authentication with Facebook failed", exception)
+                    
+                    val errorResult = when (exception) {
+                        is com.google.firebase.auth.FirebaseAuthUserCollisionException -> {
+                            AuthResult.Error(AuthException.EmailAlreadyInUse)
+                        }
+                        is com.google.firebase.auth.FirebaseAuthException -> {
+                            AuthResult.Error(mapFirebaseException(exception))
+                        }
+                        else -> {
+                            AuthResult.Error(AuthException.Unknown("Firebase authentication failed: ${exception?.message}"))
+                        }
+                    }
+                    _authState.value = errorResult
+                    if (continuation.isActive) {
+                        continuation.resume(errorResult) {}
+                    }
+                }
+            }
     }
     
     /**
