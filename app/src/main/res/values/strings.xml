@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">BrightCare Patient</string>
+    
+    <!-- Facebook Configuration -->
+    <!-- TODO: Replace these with your actual Facebook App ID and Client Token -->
+    <!-- Get these from https://developers.facebook.com/apps/YOUR_APP_ID/settings/basic/ -->
+    <string name="facebook_app_id">2816129565446988</string>
+    <string name="facebook_client_token">aec4bc46e82c7da4ed7cb9a90e722b8f</string>
+    <string name="fb_login_protocol_scheme">fb2816129565446988</string>
+</resources>

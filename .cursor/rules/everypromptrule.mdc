@@ -1,0 +1,45 @@
+---
+alwaysApply: true
+---
+
+MCP Server Enforcement
+
+Condition: If the code/project requires MCP server access.
+
+Action:
+
+Always route code generation and dependencies through the MCP server.
+
+Validate the connection before generation.
+
+Log all MCP server usage.
+
+Automatic Assembly & Debugging
+
+Trigger: Immediately after code generation.
+
+Action:
+
+Assemble/compile the generated code.
+
+Perform a debug pass to detect syntax, logic, or runtime errors.
+
+Generate a detailed error report.
+
+Automatic Error Fixing
+
+Condition: Errors are found during the assembly/debug step.
+
+Action:
+
+Attempt automated correction using:
+
+Syntax fixes (missing semicolons, mismatched brackets, wrong variable types, etc.)
+
+Dependency resolution (imports, libraries, references)
+
+Minor logic adjustments where possible (e.g., uninitialized variables)
+
+Re-run assembly/debug after each fix to confirm resolution.
+
+If an error persists beyond auto-fix capability, halt the process and report detailed info to the user.

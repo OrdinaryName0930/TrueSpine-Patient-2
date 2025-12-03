@@ -1,0 +1,242 @@
+package com.brightcare.patient.ui.viewmodel
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.brightcare.patient.data.model.*
+import com.brightcare.patient.data.repository.PatientSignUpRepository
+import com.brightcare.patient.data.repository.toSignUpRequest
+import com.brightcare.patient.ui.component.signup_component.SignUpFormState
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+
+/**
+ * ViewModel for Patient Sign Up Screen
+ * Handles authentication logic and UI state management
+ */
+class PatientSignUpViewModel(
+    private val context: Context
+) : ViewModel() {
+    
+    private val signUpRepository = PatientSignUpRepository(context = context)
+    
+    // Expose repository states
+    val authState: StateFlow<AuthResult> = signUpRepository.authState
+    val emailVerificationState: StateFlow<EmailVerificationState> = signUpRepository.emailVerificationState
+    
+    // UI state for error handling
+    private val _uiState = MutableStateFlow(SignUpUiState())
+    val uiState: StateFlow<SignUpUiState> = _uiState.asStateFlow()
+    
+    /**
+     * Sign up with email and password
+     */
+    fun signUpWithEmailAndPassword(formState: SignUpFormState, agreedToTerms: Boolean = false, agreedToPrivacy: Boolean = false) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = true,
+                    errorMessage = null,
+                    emailFieldError = null
+                )
+                
+                val request = formState.toSignUpRequest(agreedToTerms, agreedToPrivacy)
+                val result = signUpRepository.signUpWithEmailAndPassword(request)
+                
+                when (result) {
+                    is AuthResult.Success -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isSignUpSuccessful = true
+                        )
+                    }
+                    is AuthResult.Error -> {
+                        handleAuthError(result.exception)
+                    }
+                    is AuthResult.Loading -> {
+                        // Keep loading state
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "An unexpected error occurred: ${e.message}"
+                )
+            }
+        }
+    }
+    
+    /**
+     * Sign in with Google
+     */
+    fun signInWithGoogle(activity: androidx.activity.ComponentActivity) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = true,
+                    errorMessage = null
+                )
+                
+                val result = signUpRepository.signInWithGoogle(activity)
+                
+                when (result) {
+                    is AuthResult.Success -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isSocialLoginSuccessful = true
+                        )
+                    }
+                    is AuthResult.Error -> {
+                        handleAuthError(result.exception)
+                    }
+                    is AuthResult.Loading -> {
+                        // Keep loading state
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Google sign-in failed: ${e.message}"
+                )
+            }
+        }
+    }
+    
+    /**
+     * Sign in with Facebook
+     */
+    fun signInWithFacebook(activity: androidx.activity.ComponentActivity) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = true,
+                    errorMessage = null
+                )
+                
+                val result = signUpRepository.signInWithFacebook(activity)
+                
+                when (result) {
+                    is AuthResult.Success -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isSocialLoginSuccessful = true
+                        )
+                    }
+                    is AuthResult.Error -> {
+                        handleAuthError(result.exception)
+                    }
+                    is AuthResult.Loading -> {
+                        // Keep loading state
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Facebook sign-in failed: ${e.message}"
+                )
+            }
+        }
+    }
+    
+    /**
+     * Resend email verification
+     */
+    fun resendEmailVerification() {
+        viewModelScope.launch {
+            signUpRepository.sendEmailVerification()
+        }
+    }
+    
+    /**
+     * Check email verification status
+     */
+    fun checkEmailVerification() {
+        viewModelScope.launch {
+            signUpRepository.checkEmailVerification()
+        }
+    }
+    
+    /**
+     * Clear error messages
+     */
+    fun clearErrors() {
+        _uiState.value = _uiState.value.copy(
+            errorMessage = null,
+            emailFieldError = null
+        )
+    }
+    
+    /**
+     * Reset UI state (for navigation)
+     */
+    fun resetUiState() {
+        _uiState.value = SignUpUiState()
+    }
+    
+    /**
+     * Handle authentication errors and update UI state accordingly
+     */
+    private fun handleAuthError(exception: AuthException) {
+        when (exception) {
+            is AuthException.EmailAlreadyInUse -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    emailFieldError = "This email address is already in use by another account."
+                )
+            }
+            is AuthException.WeakPassword -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "The password is too weak."
+                )
+            }
+            is AuthException.InvalidEmail -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    emailFieldError = "The email address is not valid."
+                )
+            }
+            is AuthException.NetworkError -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Network error. Please check your internet connection."
+                )
+            }
+            is AuthException.UserDisabled -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "This user account has been disabled."
+                )
+            }
+            is AuthException.TooManyRequests -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Too many requests. Please try again later."
+                )
+            }
+             is AuthException.OperationNotAllowed -> {
+                 _uiState.value = _uiState.value.copy(
+                     isLoading = false,
+                     errorMessage = "This operation is not allowed."
+                 )
+             }
+            is AuthException.Unknown -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Something went wrong. Please try again."
+                )
+            }
+        }
+    }
+}
+
+/**
+ * UI state for the signup screen
+ */
+data class SignUpUiState(
+    val isLoading: Boolean = false,
+    val isSignUpSuccessful: Boolean = false,
+    val isSocialLoginSuccessful: Boolean = false,
+    val errorMessage: String? = null,
+    val emailFieldError: String? = null
+)
