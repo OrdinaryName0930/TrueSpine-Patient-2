@@ -39,7 +39,7 @@ class CompleteProfileRepository @Inject constructor(
             
             Log.d(TAG, "Saving profile for user: ${currentUser.uid}")
             
-            // Prepare the profile data (only profile-specific fields)
+            // Prepare the profile data including terms and privacy policy
             val profileData = hashMapOf(
                 "firstName" to formState.firstName.trim(),
                 "lastName" to formState.lastName.trim(),
@@ -52,6 +52,8 @@ class CompleteProfileRepository @Inject constructor(
                 "municipality" to formState.municipality,
                 "barangay" to formState.barangay,
                 "additionalAddress" to formState.additionalAddress.trim(),
+                "agreedToTerms" to formState.agreedToTerms,
+                "agreedToPrivacy" to formState.agreedToPrivacy,
                 "profileCompleted" to true
             )
             
@@ -131,7 +133,9 @@ class CompleteProfileRepository @Inject constructor(
                 province = document.getString("province") ?: "",
                 municipality = document.getString("municipality") ?: "",
                 barangay = document.getString("barangay") ?: "",
-                additionalAddress = document.getString("additionalAddress") ?: ""
+                additionalAddress = document.getString("additionalAddress") ?: "",
+                agreedToTerms = document.getBoolean("agreedToTerms") ?: false,
+                agreedToPrivacy = document.getBoolean("agreedToPrivacy") ?: false
             )
             
             Log.d(TAG, "Profile data retrieved for user: ${currentUser.uid}")
@@ -156,7 +160,7 @@ class CompleteProfileRepository @Inject constructor(
             
             Log.d(TAG, "Updating profile for user: ${currentUser.uid}")
             
-            // Prepare the update data (only profile-specific fields)
+            // Prepare the update data including terms and privacy policy
             val updateData = hashMapOf(
                 "firstName" to formState.firstName.trim(),
                 "lastName" to formState.lastName.trim(),
@@ -169,6 +173,8 @@ class CompleteProfileRepository @Inject constructor(
                 "municipality" to formState.municipality,
                 "barangay" to formState.barangay,
                 "additionalAddress" to formState.additionalAddress.trim(),
+                "agreedToTerms" to formState.agreedToTerms,
+                "agreedToPrivacy" to formState.agreedToPrivacy,
                 "profileCompleted" to true
             )
             

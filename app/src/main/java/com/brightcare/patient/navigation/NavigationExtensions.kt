@@ -135,6 +135,7 @@ fun NavController.clearSavedState() {
     currentBackStackEntry?.savedStateHandle?.apply {
         remove<Boolean>(NavigationArgs.TERMS_AGREED)
         remove<Boolean>(NavigationArgs.PRESERVE_CHECKBOX)
+        remove<Boolean>(NavigationArgs.TERMS_AGREED_COMPLETE_PROFILE)
     }
 }
 

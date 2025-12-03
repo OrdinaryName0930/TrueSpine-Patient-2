@@ -239,7 +239,7 @@ class CompleteProfileViewModel @Inject constructor(
     }
     
     /**
-     * Validate form fields
+     * Validate form fields including terms and privacy policy
      */
     private fun isFormValid(formState: CompleteProfileFormState): Boolean {
         return formState.firstName.trim().isNotBlank() &&
@@ -249,6 +249,8 @@ class CompleteProfileViewModel @Inject constructor(
                formState.phoneNumber.isNotBlank() &&
                formState.province.isNotBlank() &&
                formState.municipality.isNotBlank() &&
+               formState.agreedToTerms &&
+               formState.agreedToPrivacy &&
                !formState.isFirstNameError &&
                !formState.isLastNameError &&
                !formState.isBirthDateError &&
@@ -256,7 +258,8 @@ class CompleteProfileViewModel @Inject constructor(
                !formState.isPhoneNumberError &&
                !formState.isProvinceError &&
                !formState.isMunicipalityError &&
-               !formState.isAdditionalAddressError
+               !formState.isAdditionalAddressError &&
+               !formState.isTermsError
     }
     
     /**

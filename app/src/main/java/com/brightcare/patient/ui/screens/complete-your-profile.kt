@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.brightcare.patient.ui.component.complete_your_profile.*
 import com.brightcare.patient.ui.theme.*
 import com.brightcare.patient.ui.component.termsandconditions_and_privacypolicy.TermsBackButton
+import com.brightcare.patient.ui.component.signup_component.TermsCheckbox
 import com.brightcare.patient.ui.viewmodel.CompleteProfileViewModel
 import com.brightcare.patient.ui.viewmodel.PatientSignInViewModel
 import com.brightcare.patient.navigation.navigateToHome
@@ -44,6 +45,10 @@ data class CompleteProfileFormState(
     val barangay: String = "",
     val additionalAddress: String = "",
     
+    // Terms and Privacy Policy (moved from signup)
+    val agreedToTerms: Boolean = false,
+    val agreedToPrivacy: Boolean = false,
+    
     // Error states
     val isFirstNameError: Boolean = false,
     val isLastNameError: Boolean = false,
@@ -53,6 +58,7 @@ data class CompleteProfileFormState(
     val isProvinceError: Boolean = false,
     val isMunicipalityError: Boolean = false,
     val isAdditionalAddressError: Boolean = false,
+    val isTermsError: Boolean = false,
     
     // Error messages
     val firstNameErrorMessage: String = "",
@@ -88,7 +94,7 @@ fun CompleteYourProfileScreen(
         return
     }
     
-    // Real-time validation: check if all required fields are valid
+    // Real-time validation: check if all required fields are valid including terms/privacy
     val isFormValid by remember(uiState.formState) {
         derivedStateOf {
             uiState.formState.firstName.isNotBlank() &&
@@ -98,6 +104,8 @@ fun CompleteYourProfileScreen(
             uiState.formState.phoneNumber.isNotBlank() &&
             uiState.formState.province.isNotBlank() &&
             uiState.formState.municipality.isNotBlank() &&
+            uiState.formState.agreedToTerms &&
+            uiState.formState.agreedToPrivacy &&
             !uiState.formState.isFirstNameError &&
             !uiState.formState.isLastNameError &&
             !uiState.formState.isBirthDateError &&
@@ -105,7 +113,8 @@ fun CompleteYourProfileScreen(
             !uiState.formState.isPhoneNumberError &&
             !uiState.formState.isProvinceError &&
             !uiState.formState.isMunicipalityError &&
-            !uiState.formState.isAdditionalAddressError
+            !uiState.formState.isAdditionalAddressError &&
+            !uiState.formState.isTermsError
         }
     }
     
@@ -128,6 +137,25 @@ fun CompleteYourProfileScreen(
         LaunchedEffect(errorMessage) {
             toastState.showError(errorMessage)
             viewModel.clearError()
+        }
+    }
+    
+    // Listen for terms agreement from Terms and Conditions screen
+    LaunchedEffect(navController.currentBackStackEntry?.savedStateHandle) {
+        val termsAgreed = navController.currentBackStackEntry
+            ?.savedStateHandle
+            ?.get<Boolean>("terms_agreed_complete_profile") ?: false
+        
+        if (termsAgreed) {
+            viewModel.updateFormState { currentState ->
+                currentState.copy(
+                    agreedToTerms = true,
+                    agreedToPrivacy = true,
+                    isTermsError = false
+                )
+            }
+            // Clear the saved state
+            navController.currentBackStackEntry?.savedStateHandle?.remove<Boolean>("terms_agreed_complete_profile")
         }
     }
     
@@ -213,13 +241,44 @@ fun CompleteYourProfileScreen(
             }
         }
         
+        // Terms and Privacy Policy Checkbox (moved from signup)
+        TermsCheckbox(
+            isChecked = uiState.formState.agreedToTerms && uiState.formState.agreedToPrivacy,
+            onCheckedChange = { isChecked ->
+                viewModel.updateFormState { currentState ->
+                    currentState.copy(
+                        agreedToTerms = isChecked,
+                        agreedToPrivacy = isChecked,
+                        isTermsError = false
+                    )
+                }
+            },
+            onTermsClick = {
+                // Navigate to Terms and Conditions
+                navController.navigate("terms_and_conditions")
+            },
+            onPrivacyClick = {
+                // Navigate to Privacy Policy (same screen for now)
+                navController.navigate("terms_and_conditions")
+            },
+            isError = uiState.formState.isTermsError,
+            modifier = Modifier.padding(start = 10.dp, end = 12.dp, bottom = 15.dp, top = 8.dp)
+        )
+        
         // Save/Continue button (matching SignUp button style)
         CompleteProfileButton(
             text = "Save & Continue",
             onClick = {
-                if (isFormValid) {
-                    viewModel.saveProfile()
+                if (!isFormValid) {
+                    // Show terms error if not agreed
+                    if (!uiState.formState.agreedToTerms || !uiState.formState.agreedToPrivacy) {
+                        viewModel.updateFormState { currentState ->
+                            currentState.copy(isTermsError = true)
+                        }
+                    }
+                    return@CompleteProfileButton
                 }
+                viewModel.saveProfile()
             },
             enabled = isFormValid && !uiState.isSaving,
             loading = uiState.isSaving,

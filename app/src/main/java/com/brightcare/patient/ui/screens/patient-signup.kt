@@ -25,7 +25,6 @@ import com.brightcare.patient.data.model.EmailVerificationState
 import com.brightcare.patient.navigation.NavigationRoutes
 import com.brightcare.patient.navigation.navigateToCompleteProfile
 import com.brightcare.patient.navigation.navigateToLogin
-import com.brightcare.patient.navigation.navigateToTermsAndConditions
 import com.brightcare.patient.ui.component.signup_component.*
 import com.brightcare.patient.ui.theme.*
 import com.brightcare.patient.ui.viewmodel.PatientSignUpViewModel
@@ -83,16 +82,7 @@ fun PatientSignUpScreen(
         confirmPassword = formState.confirmPassword
     }
     
-    var termsAccepted by remember { mutableStateOf(autoCheckTerms) }
-    var isTermsError by remember { mutableStateOf(false) }
-    
-    // Update terms acceptance when autoCheckTerms changes
-    LaunchedEffect(autoCheckTerms) {
-        if (autoCheckTerms) {
-            termsAccepted = true
-            isTermsError = false
-        }
-    }
+    // Terms/Privacy removed from signup - will be handled in Complete Profile
     
     // Handle navigation based on auth state
     LaunchedEffect(authState, uiState.isSignUpSuccessful) {
@@ -144,8 +134,8 @@ fun PatientSignUpScreen(
 
     val scrollState = rememberScrollState()
 
-    // 🔹 Real-time validation: check if all fields are valid and terms accepted
-    val isFormValid by remember(formState, termsAccepted, uiState.isLoading) {
+    // 🔹 Real-time validation: check if all fields are valid (terms removed from signup)
+    val isFormValid by remember(formState, uiState.isLoading) {
         derivedStateOf {
             formState.email.isNotBlank() &&
                     formState.password.isNotBlank() &&
@@ -153,7 +143,6 @@ fun PatientSignUpScreen(
                     !formState.isEmailError &&
                     !formState.isPasswordError &&
                     !formState.isConfirmPasswordError &&
-                    termsAccepted &&
                     !uiState.isLoading
         }
     }
@@ -209,40 +198,22 @@ fun PatientSignUpScreen(
         )
 
 
-        // Terms Checkbox with Navigation
-        TermsCheckbox(
-            isChecked = termsAccepted,
-            onCheckedChange = {
-                termsAccepted = it
-                isTermsError = false
-            },
-            onTermsClick = {
-                // Save current checkbox state before navigating
-                navController.navigateToTermsAndConditions(preserveCheckbox = termsAccepted)
-            },
-            onPrivacyClick = {
-                // Optional: handle privacy separately if you have another screen
-                navController.navigateToTermsAndConditions(preserveCheckbox = termsAccepted)
-            },
-            isError = isTermsError,
-            modifier = Modifier.padding(start = 10.dp, end = 12.dp, bottom = 15.dp)
-        )
+        // Terms and Privacy Policy moved to Complete Profile screen
 
         // Sign Up Button with reactive enable/disable
         SignUpButton(
             text = "Sign up",
             onClick = {
                 if (!isFormValid) {
-                    isTermsError = !termsAccepted
                     return@SignUpButton
                 }
-                // Call ViewModel to handle signup
-                viewModel.signUpWithEmailAndPassword(formState, termsAccepted, termsAccepted)
+                // Call ViewModel to handle signup (terms/privacy removed)
+                viewModel.signUpWithEmailAndPassword(formState)
             },
             type = SignUpButtonType.PRIMARY,
             loading = uiState.isLoading,
             enabled = isFormValid, // button only clickable when form valid
-            modifier = Modifier.padding(start = 16.dp, end = 15.dp, top = 16.dp)
+            modifier = Modifier.padding(start = 16.dp, end = 15.dp, top = 24.dp)
         )
 
         // Sign In Link

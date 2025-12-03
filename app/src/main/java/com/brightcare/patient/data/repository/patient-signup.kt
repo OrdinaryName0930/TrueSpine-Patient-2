@@ -8,6 +8,7 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import com.brightcare.patient.data.model.*
 import com.brightcare.patient.ui.component.signup_component.ValidationUtils
+import com.brightcare.patient.utils.DeviceUtils
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
@@ -84,8 +85,7 @@ class PatientSignUpRepository(
                 try {
                     val userData = FirestoreUserData(
                         email = (firebaseUser.email ?: request.email).lowercase(),
-                        agreedToTerms = request.agreedToTerms,
-                        agreedToPrivacy = request.agreedToPrivacy,
+                        deviceId = request.deviceId,
                         createdAt = System.currentTimeMillis(),
                         updatedAt = System.currentTimeMillis()
                     )
@@ -205,10 +205,10 @@ class PatientSignUpRepository(
                     if (firebaseUser != null) {
                         // Store user data in Firestore for Google sign-in
                         try {
+                            val deviceId = DeviceUtils.getDeviceId(context)
                             val userData = FirestoreUserData(
                                 email = (firebaseUser.email ?: "").lowercase(),
-                                agreedToTerms = true, // Assume terms accepted for social login
-                                agreedToPrivacy = true, // Assume privacy accepted for social login
+                                deviceId = deviceId,
                                 createdAt = System.currentTimeMillis(),
                                 updatedAt = System.currentTimeMillis()
                             )
@@ -304,10 +304,10 @@ class PatientSignUpRepository(
                                 if (firebaseUser != null) {
                                     // Store user data in Firestore for Facebook sign-in
                                     try {
+                                        val deviceId = DeviceUtils.getDeviceId(context)
                                         val userData = FirestoreUserData(
                                             email = (firebaseUser.email ?: "").lowercase(),
-                                            agreedToTerms = true, // Assume terms accepted for social login
-                                            agreedToPrivacy = true, // Assume privacy accepted for social login
+                                            deviceId = deviceId,
                                             createdAt = System.currentTimeMillis(),
                                             updatedAt = System.currentTimeMillis()
                                         )
@@ -558,14 +558,12 @@ class PatientSignUpRepository(
  * Extension function to create SignUpRequest from form state
  */
 fun com.brightcare.patient.ui.component.signup_component.SignUpFormState.toSignUpRequest(
-    agreedToTerms: Boolean = false,
-    agreedToPrivacy: Boolean = false
+    deviceId: String
 ): SignUpRequest {
     return SignUpRequest(
         email = this.email.lowercase().trim(),
         password = this.password,
-        agreedToTerms = agreedToTerms,
-        agreedToPrivacy = agreedToPrivacy
+        deviceId = deviceId
     )
 }
 

@@ -158,9 +158,21 @@ fun TermsAndConditionsScreen(
                         text = "I Agree",
                         onClick = {
                             isLoading = true
-                            navController.previousBackStackEntry
-                                ?.savedStateHandle
-                                ?.set("preserve_checkbox", false)
+                            
+                            // Check if we came from Complete Profile
+                            val previousRoute = navController.previousBackStackEntry?.destination?.route
+                            if (previousRoute == "complete_profile") {
+                                // Set terms agreed for Complete Profile
+                                navController.previousBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("terms_agreed_complete_profile", true)
+                            } else {
+                                // Original signup flow
+                                navController.previousBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("preserve_checkbox", false)
+                            }
+                            
                             onAgreeClicked()
                             navController.popBackStack()
                         },

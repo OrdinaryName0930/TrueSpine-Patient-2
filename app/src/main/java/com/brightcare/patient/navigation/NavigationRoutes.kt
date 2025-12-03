@@ -34,6 +34,7 @@ object NavigationArgs {
     const val EMAIL = "email"
     const val TERMS_AGREED = "terms_agreed"
     const val PRESERVE_CHECKBOX = "preserve_checkbox"
+    const val TERMS_AGREED_COMPLETE_PROFILE = "terms_agreed_complete_profile"
 }
 
 

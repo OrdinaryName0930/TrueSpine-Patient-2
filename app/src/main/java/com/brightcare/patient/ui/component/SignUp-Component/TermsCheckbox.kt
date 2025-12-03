@@ -93,7 +93,7 @@ fun TermsCheckbox(
 
         if (isError) {
             Text(
-                text = "You must agree to continue",
+                text = "*You must agree to continue",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 0.dp, start = 22.dp)

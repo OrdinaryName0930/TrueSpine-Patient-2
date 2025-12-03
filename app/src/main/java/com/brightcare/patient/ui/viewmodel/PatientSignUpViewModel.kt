@@ -7,6 +7,7 @@ import com.brightcare.patient.data.model.*
 import com.brightcare.patient.data.repository.PatientSignUpRepository
 import com.brightcare.patient.data.repository.toSignUpRequest
 import com.brightcare.patient.ui.component.signup_component.SignUpFormState
+import com.brightcare.patient.utils.DeviceUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -31,7 +32,7 @@ class PatientSignUpViewModel(
     /**
      * Sign up with email and password
      */
-    fun signUpWithEmailAndPassword(formState: SignUpFormState, agreedToTerms: Boolean = false, agreedToPrivacy: Boolean = false) {
+    fun signUpWithEmailAndPassword(formState: SignUpFormState) {
         viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value.copy(
@@ -40,7 +41,8 @@ class PatientSignUpViewModel(
                     emailFieldError = null
                 )
                 
-                val request = formState.toSignUpRequest(agreedToTerms, agreedToPrivacy)
+                val deviceId = DeviceUtils.getDeviceId(context)
+                val request = formState.toSignUpRequest(deviceId)
                 val result = signUpRepository.signUpWithEmailAndPassword(request)
                 
                 when (result) {

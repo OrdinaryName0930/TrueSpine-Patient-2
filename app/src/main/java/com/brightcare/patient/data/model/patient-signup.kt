@@ -16,8 +16,7 @@ import javax.crypto.SecretKeyFactory
 data class SignUpRequest(
     val email: String,
     val password: String,
-    val agreedToTerms: Boolean = false,
-    val agreedToPrivacy: Boolean = false
+    val deviceId: String
 )
 
 /**
@@ -107,8 +106,7 @@ data class EmailVerificationState(
  */
 data class FirestoreUserData(
     val email: String = "",
-    val agreedToTerms: Boolean = false,
-    val agreedToPrivacy: Boolean = false,
+    val deviceId: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {
