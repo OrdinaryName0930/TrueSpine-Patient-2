@@ -23,8 +23,12 @@ object NavigationRoutes {
     const val MESSAGE = "message"
     const val PROFILE = "profile"
     
+    // Conversation/Chat routes
+    const val CONVERSATION = "conversation/{conversationId}"
+    
     // Helper functions for parameterized routes
     fun forgotPasswordOtp(email: String) = "forgot_password_otp/$email"
+    fun conversation(conversationId: String) = "conversation/$conversationId"
 }
 
 /**
@@ -35,6 +39,7 @@ object NavigationArgs {
     const val TERMS_AGREED = "terms_agreed"
     const val PRESERVE_CHECKBOX = "preserve_checkbox"
     const val TERMS_AGREED_COMPLETE_PROFILE = "terms_agreed_complete_profile"
+    const val CONVERSATION_ID = "conversationId"
 }
 
 

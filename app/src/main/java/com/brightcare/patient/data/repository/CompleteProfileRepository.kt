@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.brightcare.patient.ui.screens.CompleteProfileFormState
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -28,16 +29,17 @@ class CompleteProfileRepository @Inject constructor(
     /**
      * Save complete profile data to Firestore
      * Stores the information in "client" collection with user's UID as document ID
+     * I-save ang complete profile data sa Firestore
      */
     suspend fun saveCompleteProfile(formState: CompleteProfileFormState): Result<Unit> {
         return try {
             val currentUser = firebaseAuth.currentUser
             if (currentUser == null) {
-                Log.e(TAG, "No authenticated user found")
-                return Result.failure(Exception("User not authenticated"))
+                Log.e(TAG, "No authenticated user found when saving profile")
+                return Result.failure(Exception("User must be logged in to save profile"))
             }
             
-            Log.d(TAG, "Saving profile for user: ${currentUser.uid}")
+            Log.d(TAG, "Saving profile for authenticated user: ${currentUser.uid}")
             
             // Prepare the profile data including terms and privacy policy
             val profileData = hashMapOf(
@@ -54,7 +56,9 @@ class CompleteProfileRepository @Inject constructor(
                 "additionalAddress" to formState.additionalAddress.trim(),
                 "agreedToTerms" to formState.agreedToTerms,
                 "agreedToPrivacy" to formState.agreedToPrivacy,
-                "profileCompleted" to true
+                "profileCompleted" to true,
+                "createdAt" to System.currentTimeMillis(),
+                "updatedAt" to System.currentTimeMillis()
             )
             
             // Update existing document with profile data (merge to preserve existing fields)
@@ -66,22 +70,38 @@ class CompleteProfileRepository @Inject constructor(
             Log.d(TAG, "Profile saved successfully for user: ${currentUser.uid}")
             Result.success(Unit)
             
+        } catch (e: FirebaseFirestoreException) {
+            Log.e(TAG, "Firestore permission error saving profile: ${e.code} - ${e.message}", e)
+            when (e.code) {
+                FirebaseFirestoreException.Code.PERMISSION_DENIED -> {
+                    Result.failure(Exception("Access denied. Please make sure you are logged in and have permission to save your profile."))
+                }
+                FirebaseFirestoreException.Code.UNAUTHENTICATED -> {
+                    Result.failure(Exception("Authentication required. Please log in to save your profile."))
+                }
+                else -> {
+                    Result.failure(Exception("Failed to save profile: ${e.message}"))
+                }
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error saving profile", e)
-            Result.failure(e)
+            Log.e(TAG, "Unexpected error saving profile", e)
+            Result.failure(Exception("Failed to save profile: ${e.message}"))
         }
     }
     
     /**
      * Check if user's profile is already completed
+     * Tignan kung tapos na ang profile ng user
      */
     suspend fun isProfileCompleted(): Result<Boolean> {
         return try {
             val currentUser = firebaseAuth.currentUser
             if (currentUser == null) {
-                Log.e(TAG, "No authenticated user found")
+                Log.e(TAG, "No authenticated user found when checking profile completion")
                 return Result.success(false)
             }
+            
+            Log.d(TAG, "Checking profile completion for user: ${currentUser.uid}")
             
             val document = firestore.collection(COLLECTION_CLIENTS)
                 .document(currentUser.uid)
@@ -94,22 +114,38 @@ class CompleteProfileRepository @Inject constructor(
             Log.d(TAG, "Profile completion status for ${currentUser.uid}: $isCompleted")
             Result.success(isCompleted)
             
+        } catch (e: FirebaseFirestoreException) {
+            Log.e(TAG, "Firestore permission error checking profile completion: ${e.code} - ${e.message}", e)
+            when (e.code) {
+                FirebaseFirestoreException.Code.PERMISSION_DENIED -> {
+                    Result.failure(Exception("Access denied. Please make sure you are logged in and have permission to check your profile."))
+                }
+                FirebaseFirestoreException.Code.UNAUTHENTICATED -> {
+                    Result.failure(Exception("Authentication required. Please log in to check your profile."))
+                }
+                else -> {
+                    Result.failure(Exception("Failed to check profile completion: ${e.message}"))
+                }
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking profile completion status", e)
-            Result.failure(e)
+            Log.e(TAG, "Unexpected error checking profile completion status", e)
+            Result.failure(Exception("Failed to check profile completion: ${e.message}"))
         }
     }
     
     /**
      * Get existing profile data for the current user
+     * Kumuha ng existing profile data para sa current user
      */
     suspend fun getProfileData(): Result<CompleteProfileFormState?> {
         return try {
             val currentUser = firebaseAuth.currentUser
             if (currentUser == null) {
-                Log.e(TAG, "No authenticated user found")
-                return Result.success(null)
+                Log.e(TAG, "No authenticated user found when getting profile data")
+                return Result.failure(Exception("User must be logged in to view profile data"))
             }
+            
+            Log.d(TAG, "Fetching profile data for user: ${currentUser.uid}")
             
             val document = firestore.collection(COLLECTION_CLIENTS)
                 .document(currentUser.uid)
@@ -138,12 +174,25 @@ class CompleteProfileRepository @Inject constructor(
                 agreedToPrivacy = document.getBoolean("agreedToPrivacy") ?: false
             )
             
-            Log.d(TAG, "Profile data retrieved for user: ${currentUser.uid}")
+            Log.d(TAG, "Profile data retrieved successfully for user: ${currentUser.uid}")
             Result.success(formState)
             
+        } catch (e: FirebaseFirestoreException) {
+            Log.e(TAG, "Firestore permission error getting profile data: ${e.code} - ${e.message}", e)
+            when (e.code) {
+                FirebaseFirestoreException.Code.PERMISSION_DENIED -> {
+                    Result.failure(Exception("Access denied. Please make sure you are logged in and have permission to view your profile."))
+                }
+                FirebaseFirestoreException.Code.UNAUTHENTICATED -> {
+                    Result.failure(Exception("Authentication required. Please log in to view your profile."))
+                }
+                else -> {
+                    Result.failure(Exception("Failed to load profile: ${e.message}"))
+                }
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error retrieving profile data", e)
-            Result.failure(e)
+            Log.e(TAG, "Unexpected error retrieving profile data", e)
+            Result.failure(Exception("Failed to load profile: ${e.message}"))
         }
     }
     

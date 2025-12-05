@@ -25,6 +25,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brightcare.patient.ui.theme.*
 import com.brightcare.patient.ui.viewmodel.PatientSignInViewModel
+import com.brightcare.patient.navigation.NavigationRoutes
 
 data class ProfileMenuItem(
     val title: String,
@@ -43,7 +44,8 @@ data class ProfileMenuItem(
 fun ProfileScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
-    signInViewModel: PatientSignInViewModel = hiltViewModel()
+    signInViewModel: PatientSignInViewModel = hiltViewModel(),
+    authViewModel: AuthenticationViewModel = hiltViewModel()
 ) {
     val scrollState = rememberScrollState()
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -291,8 +293,10 @@ fun ProfileScreen(
                 Button(
                     onClick = {
                         showLogoutDialog = false
+                        // Use the new logout functionality
+                        authViewModel.logout()
                         signInViewModel.signOut()
-                        navController.navigate("login?clearStates=true") {
+                        navController.navigate(NavigationRoutes.LOGIN) {
                             popUpTo(0) { inclusive = true }
                         }
                     },

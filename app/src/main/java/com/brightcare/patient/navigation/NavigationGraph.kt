@@ -253,6 +253,29 @@ fun NavigationGraph(
                 navController = navController
             )
         }
+        
+        // Conversation Screen
+        composable(
+            NavigationRoutes.CONVERSATION,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(600)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(600)
+                )
+            }
+        ) { backStackEntry ->
+            val conversationId = backStackEntry.arguments?.getString(NavigationArgs.CONVERSATION_ID) ?: ""
+            ConversationScreen(
+                conversationId = conversationId,
+                navController = navController
+            )
+        }
     }
 }
 

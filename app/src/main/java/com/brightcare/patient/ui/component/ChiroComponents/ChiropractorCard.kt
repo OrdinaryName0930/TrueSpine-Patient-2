@@ -172,9 +172,9 @@ fun ChiropractorCard(
                             modifier = Modifier.padding(horizontal = 4.dp)
                         )
 
-                        // Reviews count (example: 49 Reviews)
+                        // Reviews count (from Firestore data)
                         Text(
-                            text = "40 Reviews",
+                            text = "${chiropractor.reviewCount} Reviews",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontWeight = FontWeight.SemiBold,
                                 color = Gray400

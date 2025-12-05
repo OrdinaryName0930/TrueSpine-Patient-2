@@ -27,7 +27,8 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class PatientSignInViewModel @Inject constructor(
-    private val loginRepository: PatientLoginRepository
+    private val loginRepository: PatientLoginRepository,
+    private val authenticationManager: com.brightcare.patient.utils.AuthenticationManager
 ) : ViewModel() {
     
     // UI State
@@ -143,6 +144,16 @@ class PatientSignInViewModel @Inject constructor(
                 when (result) {
                     is LoginResult.Success -> {
                         Log.d(TAG, "Email/password sign-in successful")
+                        
+                        // Save login state for persistent login
+                        authenticationManager.saveLoginState(
+                            userId = result.response.userId,
+                            userEmail = result.response.email,
+                            userName = result.response.displayName ?: "",
+                            accessToken = null, // Add when available from backend
+                            refreshToken = null // Add when available from backend
+                        )
+                        
                         clearForm()
                         clearCredentialError()
                         setEmailPasswordLoading(false)
@@ -185,6 +196,16 @@ class PatientSignInViewModel @Inject constructor(
                 when (result) {
                     is LoginResult.Success -> {
                         Log.d(TAG, "Google sign-in successful")
+                        
+                        // Save login state for persistent login
+                        authenticationManager.saveLoginState(
+                            userId = result.response.userId,
+                            userEmail = result.response.email,
+                            userName = result.response.displayName ?: "",
+                            accessToken = null, // Add when available from backend
+                            refreshToken = null // Add when available from backend
+                        )
+                        
                         setGoogleLoading(false)
                     }
                     is LoginResult.Error -> {
@@ -225,6 +246,16 @@ class PatientSignInViewModel @Inject constructor(
                 when (result) {
                     is LoginResult.Success -> {
                         Log.d(TAG, "Facebook sign-in successful")
+                        
+                        // Save login state for persistent login
+                        authenticationManager.saveLoginState(
+                            userId = result.response.userId,
+                            userEmail = result.response.email,
+                            userName = result.response.displayName ?: "",
+                            accessToken = null, // Add when available from backend
+                            refreshToken = null // Add when available from backend
+                        )
+                        
                         setFacebookLoading(false)
                     }
                     is LoginResult.Error -> {
@@ -480,6 +511,33 @@ class PatientSignInViewModel @Inject constructor(
                 }
             }
             else -> null
+        }
+    }
+    
+    /**
+     * Logout function - clears persistent login state
+     * Logout function - nag-clear ng persistent login state
+     */
+    fun logout() {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Starting logout process")
+                
+                // Clear authentication state
+                authenticationManager.clearLoginState()
+                
+                // Clear any cached data or states in the ViewModel
+                clearForm()
+                clearCredentialError()
+                _loginResult.value = null
+                
+                // You can also call repository logout if needed
+                // loginRepository.logout()
+                
+                Log.d(TAG, "Logout completed successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during logout", e)
+            }
         }
     }
     
