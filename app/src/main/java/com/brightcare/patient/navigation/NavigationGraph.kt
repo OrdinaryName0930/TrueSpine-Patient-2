@@ -11,6 +11,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.brightcare.patient.ui.screens.*
+import com.brightcare.patient.ui.component.PermissionRequestScreen
 import com.brightcare.patient.utils.OnboardingPreferences
 import android.util.Log
 
@@ -39,9 +40,25 @@ fun NavigationGraph(
                     // Markahan ang onboarding bilang nakita na
                     OnboardingPreferences.setOnboardingSeen(context)
                     
-                    // Navigate to login
-                    navController.navigate(NavigationRoutes.LOGIN) {
+                    // Navigate to permissions screen
+                    navController.navigate(NavigationRoutes.PERMISSIONS) {
                         popUpTo(NavigationRoutes.ONBOARDING) { inclusive = true }
+                    }
+                }
+            )
+        }
+        
+        // Permission Request Screen
+        composable(NavigationRoutes.PERMISSIONS) {
+            val context = LocalContext.current
+            PermissionRequestScreen(
+                onPermissionsGranted = {
+                    // Mark permissions as requested
+                    OnboardingPreferences.setPermissionsRequested(context)
+                    
+                    // Navigate to login after permissions
+                    navController.navigate(NavigationRoutes.LOGIN) {
+                        popUpTo(NavigationRoutes.PERMISSIONS) { inclusive = true }
                     }
                 }
             )
@@ -103,13 +120,15 @@ fun NavigationGraph(
         
         // Terms and Conditions Screen
         composable(NavigationRoutes.TERMS_AND_CONDITIONS) {
-            TermsAndConditionsScreen(
-                navController = navController,
-                onAgreeClicked = {
-                    // Set the flag that terms were agreed to
-                    navController.previousBackStackEntry?.savedStateHandle
-                        ?.set(NavigationArgs.TERMS_AGREED, true)
-                }
+            TermsConditionsScreen(
+                navController = navController
+            )
+        }
+        
+        // Privacy Policy Screen
+        composable(NavigationRoutes.PRIVACY_POLICY) {
+            PrivacyPolicyScreen(
+                navController = navController
             )
         }
         
@@ -235,7 +254,30 @@ fun NavigationGraph(
         
         // Main Dashboard Screen with Navigation Fragment
         composable(
-            NavigationRoutes.MAIN_DASHBOARD,
+            "${NavigationRoutes.MAIN_DASHBOARD}?initialRoute={initialRoute}",
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(600)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(600)
+                )
+            }
+        ) { backStackEntry ->
+            val initialRoute = backStackEntry.arguments?.getString("initialRoute") ?: "home"
+            MainDashboardScreen(
+                navController = navController,
+                initialRoute = initialRoute
+            )
+        }
+        
+        // Personal Details Screen
+        composable(
+            NavigationRoutes.PERSONAL_DETAILS,
             enterTransition = {
                 slideInHorizontally(
                     initialOffsetX = { fullWidth -> fullWidth },
@@ -249,7 +291,74 @@ fun NavigationGraph(
                 )
             }
         ) {
-            MainDashboardScreen(
+            PersonalDetailsScreen(
+                navController = navController
+            )
+        }
+        
+        // Emergency Contacts Screen
+        composable(
+            NavigationRoutes.EMERGENCY_CONTACTS,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(600)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(600)
+                )
+            }
+        ) {
+            EmergencyContactScreen(
+                navController = navController
+            )
+        }
+        
+        // Chiropractor Booking Screen
+        composable(
+            NavigationRoutes.CHIROPRACTOR_BOOKING,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(600)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(600)
+                )
+            }
+        ) { backStackEntry ->
+            val chiropractorId = backStackEntry.arguments?.getString(NavigationArgs.CHIROPRACTOR_ID) ?: ""
+            ChiropractorBookingScreen(
+                chiropractorId = chiropractorId,
+                navController = navController
+            )
+        }
+        
+        // Book Appointment Activity Screen
+        composable(
+            NavigationRoutes.BOOK_APPOINTMENT,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(600)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(600)
+                )
+            }
+        ) { backStackEntry ->
+            val chiropractorId = backStackEntry.arguments?.getString(NavigationArgs.CHIROPRACTOR_ID) ?: ""
+            BookAppointmentActivity(
+                chiropractorId = chiropractorId,
                 navController = navController
             )
         }
@@ -273,6 +382,73 @@ fun NavigationGraph(
             val conversationId = backStackEntry.arguments?.getString(NavigationArgs.CONVERSATION_ID) ?: ""
             ConversationScreen(
                 conversationId = conversationId,
+                navController = navController
+            )
+        }
+        
+        // View Profile Screen
+        composable(
+            NavigationRoutes.VIEW_PROFILE,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(600)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(600)
+                )
+            }
+        ) { backStackEntry ->
+            val chiropractorId = backStackEntry.arguments?.getString(NavigationArgs.CHIROPRACTOR_ID) ?: ""
+            ViewProfileScreen(
+                chiropractorId = chiropractorId,
+                navController = navController
+            )
+        }
+        
+        // Appointment Details Screen
+        composable(
+            NavigationRoutes.APPOINTMENT_DETAILS,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(600)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(600)
+                )
+            }
+        ) { backStackEntry ->
+            val appointmentId = backStackEntry.arguments?.getString(NavigationArgs.APPOINTMENT_ID) ?: ""
+            AppointmentDetailsScreen(
+                appointmentId = appointmentId,
+                navController = navController
+            )
+        }
+        
+        // Notifications Screen
+        composable(
+            NavigationRoutes.NOTIFICATIONS,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(600)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(600)
+                )
+            }
+        ) {
+            NotificationScreen(
                 navController = navController
             )
         }

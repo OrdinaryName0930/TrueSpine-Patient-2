@@ -164,4 +164,17 @@ Conversation-Component/
 
 The conversation component provides a **complete messenger-like experience** with attachment support and Firestore integration ready for healthcare communication!
 
-**Ang conversation component ay nagbibigay ng complete messenger-like experience na may attachment support at Firestore integration na ready para sa healthcare communication!**
+
+
+
+
+
+
+
+
+
+
+
+
+
+

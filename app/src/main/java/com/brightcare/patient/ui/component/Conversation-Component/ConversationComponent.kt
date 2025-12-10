@@ -1,190 +1,167 @@
 package com.brightcare.patient.ui.component.conversationcomponent
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.brightcare.patient.ui.component.messagecomponent.*
+import java.util.Date
 import com.brightcare.patient.ui.theme.*
+import com.brightcare.patient.ui.viewmodel.ConversationListViewModel
+import com.brightcare.patient.ui.viewmodel.ChiropractorDisplayItem
+import com.brightcare.patient.navigation.NavigationRoutes
 import kotlinx.coroutines.launch
 
 /**
- * Main Conversation Component - Reusable component for individual chat conversations
- * Pangunahing Conversation Component - Reusable component para sa individual na chat conversations
+ * Main Conversation Component - Shows list of chiropractors with search
+ * Pangunahing Conversation Component - Nagpapakita ng listahan ng mga chiropractor na may search
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationComponent(
-    conversationId: String,
     navController: NavController,
     modifier: Modifier = Modifier,
-    onBackClick: () -> Unit = { navController.popBackStack() }
+    viewModel: ConversationListViewModel = hiltViewModel(),
+    onChiropractorClick: (String) -> Unit = { conversationId ->
+        // Mark conversation as read immediately when card is clicked
+        // I-mark ang conversation bilang nabasa agad kapag na-click ang card
+        viewModel.markConversationAsReadOnClick(conversationId)
+        navController.navigate(NavigationRoutes.conversation(conversationId))
+    }
 ) {
-    // Message input state
-    var messageText by remember { mutableStateOf("") }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    
-    // Conversation and messages state
-    var conversation by remember { mutableStateOf<ChatConversation?>(null) }
-    var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    
-    // Load conversation data
-    LaunchedEffect(conversationId) {
-        // Load from Firestore or use sample data
-        conversation = getSampleConversationById(conversationId)
-        messages = getSampleMessages(conversationId)
-        isLoading = false
-    }
-    
-    // Auto-scroll to bottom when new message is added
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            coroutineScope.launch {
-                listState.animateScrollToItem(messages.size - 1)
-            }
-        }
-    }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val displayChiropractors by viewModel.getDisplayChiropractors().collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(WhiteBg)
-    ) {
-        // Fixed Header
-        conversation?.let { conv ->
-            ConversationHeader(
-                conversation = conv,
-                onBackClick = onBackClick
+    )
+    {
+        // Search bar
+        
+        // Show error if any
+        uiState.error?.let { error ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TextButton(
+                            onClick = viewModel::refreshData
+                        ) {
+                            Text("Retry")
+                        }
+                        TextButton(
+                            onClick = viewModel::clearError
+                        ) {
+                            Text("Dismiss")
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Loading state
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(color = Blue500)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Loading chiropractors...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Gray600
+                    )
+                }
+            }
+        }
+        
+        // Use ConversationsList with ConversationCard components
+        // Gamitin ang ConversationsList na may ConversationCard components
+        val conversations: List<com.brightcare.patient.ui.component.messagecomponent.ChatConversation> = displayChiropractors.map { item ->
+            // Convert ChiropractorDisplayItem to ChatConversation
+            // I-convert ang ChiropractorDisplayItem sa ChatConversation
+            com.brightcare.patient.ui.component.messagecomponent.ChatConversation(
+                id = item.conversationId ?: "new_${item.chiropractor.uid}",
+                participantName = item.chiropractor.fullName,
+                participantType = com.brightcare.patient.ui.component.messagecomponent.SenderType.DOCTOR, // All chiropractors are doctors
+                lastMessage = item.lastMessage ?: "Tap to start conversation",
+                lastMessageTime = item.lastMessageTime ?: Date(),
+                unreadCount = item.unreadCount,
+                isOnline = item.chiropractor.isAvailable,
+                profileImageUrl = item.chiropractor.profileImage, // Pass the actual profile image URL
+                hasNewMessage = item.unreadCount > 0, // Set hasNewMessage based on unread count
+                phoneNumber = item.chiropractor.phoneNumber, // Pass the phone number for call functionality
+                specialization = item.chiropractor.specialization // Pass the specialization
             )
         }
         
-        if (isLoading) {
-            // Loading state
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = androidx.compose.ui.Alignment.Center
-            ) {
-                CircularProgressIndicator(color = Blue500)
-            }
-        } else {
-            // Messages list - Start from bottom
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                reverseLayout = false // Keep normal layout, messages will be added to bottom
-            ) {
-                items(messages) { message ->
-                    MessageBubble(
-                        message = message,
-                        isFromCurrentUser = message.senderType == SenderType.PATIENT
-                    )
-                }
-            }
-        }
-        
-        // Message input area with attachment support
-        MessageInputArea(
-            messageText = messageText,
-            onMessageTextChange = { messageText = it },
-            onSendMessage = {
-                if (messageText.trim().isNotEmpty()) {
-                    // Send message to Firestore
-                    sendMessageToFirestore(
-                        conversationId = conversationId,
-                        messageText = messageText.trim(),
-                        onSuccess = { newMessage ->
-                            // Add message to local list
-                            messages = messages + newMessage
-                            messageText = ""
-                            keyboardController?.hide()
-                        },
-                        onError = { error ->
-                            // Handle error (show snackbar, etc.)
-                            // For now, just clear the message
-                            messageText = ""
-                        }
-                    )
-                }
+        ConversationsList(
+            conversations = conversations,
+            onConversationClick = { conversationId ->
+                onChiropractorClick(conversationId)
             },
-            onAttachmentClick = {
-                // Handle attachment selection
-                // TODO: Implement file picker
-            },
-            onImageClick = {
-                // Handle image selection
-                // TODO: Implement image picker
+            modifier = Modifier.fillMaxSize(),
+            isRefreshing = uiState.isLoading,
+            onRefresh = {
+                // Refresh the chiropractors data
+                // I-refresh ang data ng mga chiropractor
+                viewModel.refreshData()
             }
         )
     }
 }
 
-/**
- * Send message to Firestore
- * Magpadala ng message sa Firestore
- */
-private fun sendMessageToFirestore(
-    conversationId: String,
-    messageText: String,
-    onSuccess: (ChatMessage) -> Unit,
-    onError: (Exception) -> Unit
-) {
-    // Create new message
-    val newMessage = ChatMessage(
-        id = "msg_${System.currentTimeMillis()}",
-        senderId = "current_user", // TODO: Get from AuthenticationManager
-        senderName = "You",
-        senderType = SenderType.PATIENT,
-        message = messageText,
-        timestamp = java.util.Date(),
-        isRead = false,
-        attachments = emptyList()
-    )
-    
-    // TODO: Implement actual Firestore save
-    // For now, simulate success
-    onSuccess(newMessage)
-    
-    /* 
-    Firestore implementation would look like:
-    
-    val db = FirebaseFirestore.getInstance()
-    val messageData = hashMapOf(
-        "senderId" to newMessage.senderId,
-        "senderName" to newMessage.senderName,
-        "senderType" to newMessage.senderType.name,
-        "message" to newMessage.message,
-        "timestamp" to newMessage.timestamp,
-        "isRead" to newMessage.isRead,
-        "attachments" to newMessage.attachments
-    )
-    
-    db.collection("conversations")
-        .document(conversationId)
-        .collection("messages")
-        .document(newMessage.id)
-        .set(messageData)
-        .addOnSuccessListener { onSuccess(newMessage) }
-        .addOnFailureListener { exception -> onError(exception) }
-    */
-}
+// Removed ChiropractorCard - now using ConversationCard from ConversationsList
+
+// Dummy data functions removed - now using real Firestore data through MessagingIntegrationProvider
 
 /**
  * Preview for ConversationComponent
@@ -199,7 +176,6 @@ private fun sendMessageToFirestore(
 fun ConversationComponentPreview() {
     BrightCarePatientTheme {
         ConversationComponent(
-            conversationId = "1",
             navController = rememberNavController()
         )
     }

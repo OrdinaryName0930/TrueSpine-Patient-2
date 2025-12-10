@@ -5,10 +5,15 @@ import com.brightcare.patient.data.repository.PatientSignUpRepository
 import com.brightcare.patient.data.repository.PatientLoginRepository
 import com.brightcare.patient.data.repository.PatientForgotPasswordRepository
 import com.brightcare.patient.data.repository.CompleteProfileRepository
+import com.brightcare.patient.data.repository.EmergencyContactRepository
+import com.brightcare.patient.data.repository.BookingRepository
+import com.brightcare.patient.data.repository.NotificationRepository
+import com.brightcare.patient.data.repository.ProfileValidationService
 import com.brightcare.patient.data.service.EmailService
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.storage.FirebaseStorage
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -49,6 +54,15 @@ object AppModule {
     @Singleton
     fun provideFirebaseFunctions(): FirebaseFunctions {
         return FirebaseFunctions.getInstance()
+    }
+    
+    /**
+     * Provides Firebase Storage instance
+     */
+    @Provides
+    @Singleton
+    fun provideFirebaseStorage(): FirebaseStorage {
+        return FirebaseStorage.getInstance()
     }
     
     /**
@@ -111,9 +125,59 @@ object AppModule {
     fun provideCompleteProfileRepository(
         firebaseAuth: FirebaseAuth,
         firestore: FirebaseFirestore,
+        firebaseStorage: FirebaseStorage,
         @ApplicationContext context: Context
     ): CompleteProfileRepository {
-        return CompleteProfileRepository(firebaseAuth, firestore, context)
+        return CompleteProfileRepository(firebaseAuth, firestore, firebaseStorage, context)
+    }
+    
+    /**
+     * Provides EmergencyContactRepository instance
+     */
+    @Provides
+    @Singleton
+    fun provideEmergencyContactRepository(
+        firebaseAuth: FirebaseAuth,
+        firestore: FirebaseFirestore
+    ): EmergencyContactRepository {
+        return EmergencyContactRepository(firebaseAuth, firestore)
+    }
+    
+    /**
+     * Provides ProfileValidationService instance
+     */
+    @Provides
+    @Singleton
+    fun provideProfileValidationService(
+        completeProfileRepository: CompleteProfileRepository,
+        emergencyContactRepository: EmergencyContactRepository
+    ): ProfileValidationService {
+        return ProfileValidationService(completeProfileRepository, emergencyContactRepository)
+    }
+    
+    /**
+     * Provides BookingRepository instance
+     */
+    @Provides
+    @Singleton
+    fun provideBookingRepository(
+        firebaseAuth: FirebaseAuth,
+        firestore: FirebaseFirestore,
+        profileValidationService: ProfileValidationService
+    ): BookingRepository {
+        return BookingRepository(firebaseAuth, firestore, profileValidationService)
+    }
+    
+    /**
+     * Provides NotificationRepository instance
+     */
+    @Provides
+    @Singleton
+    fun provideNotificationRepository(
+        firebaseAuth: FirebaseAuth,
+        firestore: FirebaseFirestore
+    ): NotificationRepository {
+        return NotificationRepository(firebaseAuth, firestore)
     }
 }
 

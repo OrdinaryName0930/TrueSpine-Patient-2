@@ -1,105 +1,326 @@
 package com.brightcare.patient.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import com.brightcare.patient.ui.component.termsandconditions_and_privacypolicy.TermsBackButton
 import com.brightcare.patient.ui.theme.*
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.collectAsState
+import com.brightcare.patient.ui.BrightCareToast
+import com.brightcare.patient.ui.rememberToastState
+import com.brightcare.patient.ui.showInfo
+import com.brightcare.patient.ui.showError
+import com.brightcare.patient.ui.component.signup_component.ValidationUtils
+import com.brightcare.patient.navigation.NavigationRoutes
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChangePasswordScreen(
     navController: NavController,
-    onBackClick: () -> Unit = { navController.popBackStack() },
-    onPasswordResetClick: () -> Unit = { 
-        navController.navigate("login") {
-            popUpTo(0) { inclusive = true }
+    onBackClick: () -> Unit = {
+        navController.navigate("${NavigationRoutes.MAIN_DASHBOARD}?initialRoute=profile") {
+            popUpTo(NavigationRoutes.MAIN_DASHBOARD) { inclusive = false }
+        }
+    },
+    authViewModel: AuthenticationViewModel = hiltViewModel()
+) {
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+
+    var currentPasswordVisible by remember { mutableStateOf(false) }
+    var newPasswordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    var isLoading by remember { mutableStateOf(false) }
+
+    val scrollState = rememberScrollState()
+    val toastState = rememberToastState()
+
+    BackHandler {
+        navController.navigate("${NavigationRoutes.MAIN_DASHBOARD}?initialRoute=profile") {
+            popUpTo(NavigationRoutes.MAIN_DASHBOARD) { inclusive = false }
         }
     }
-) {
+
+    // UI interaction states
+    var hasInteractedCurrent by remember { mutableStateOf(false) }
+    var hasInteractedNew by remember { mutableStateOf(false) }
+    var hasInteractedConfirm by remember { mutableStateOf(false) }
+
+    // 🔵 Remove current password validation entirely
+    val isCurrentPasswordValid = true   // always valid
+
+    // Normal validation for new + confirm password
+    val isNewPasswordValid = ValidationUtils.isStrongPassword(newPassword)
+            && ValidationUtils.hasNoWhitespace(newPassword)
+
+    val isConfirmPasswordValid = confirmPassword == newPassword && confirmPassword.isNotEmpty()
+
+    val isFormValid = isCurrentPasswordValid && isNewPasswordValid && isConfirmPasswordValid
+
+    val passwordStrength = ValidationUtils.getPasswordStrength(newPassword)
+    val passwordStrengthText = ValidationUtils.getPasswordStrengthText(passwordStrength)
+
+    val changePasswordResult by authViewModel.changePasswordResult.collectAsState()
+
+    LaunchedEffect(changePasswordResult) {
+        changePasswordResult?.let { result ->
+            isLoading = false
+            if (result.isSuccess) {
+                toastState.showInfo("Password changed successfully!")
+                currentPassword = ""
+                newPassword = ""
+                confirmPassword = ""
+                kotlinx.coroutines.delay(1500)
+                navController.popBackStack()
+            } else {
+                toastState.showError(result.exceptionOrNull()?.message ?: "Failed to change password")
+            }
+            authViewModel.clearChangePasswordResult()
+        }
+    }
+
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(WhiteBg)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(WhiteBg)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(12.dp)
+                .verticalScroll(scrollState),
+            horizontalAlignment = Alignment.Start
         ) {
-            // Back Button
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 32.dp),
-                horizontalArrangement = Arrangement.Start
+                    .padding(bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                TermsBackButton(
-                    onClick = onBackClick
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Gray600
+                    )
+                }
+
+                Text(
+                    text = "Change Password",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Blue500,
+                        fontSize = 28.sp
+                    )
                 )
             }
-            
-            // Title
+
             Text(
-                text = "Password Reset",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 32.sp
-                ),
-                color = Blue500,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 16.dp)
+                text = "Enter your current password and choose a new secure password.",
+                style = MaterialTheme.typography.bodyMedium.copy(color = Gray600),
+                modifier = Modifier.padding(bottom = 16.dp, top = 16.dp, start = 16.dp, end = 16.dp)
             )
-            
-            // Description
-            Text(
-                text = "Password reset is now handled via email link. Please check your email and click the reset link to change your password.",
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    color = Gray600,
-                    lineHeight = 24.sp
-                ),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // Go to Login Button
-            Button(
-                onClick = onPasswordResetClick,
+
+            // Form fields with signup-style padding
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = 16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Blue500
-                )
+                    .padding(top = 16.dp)
+                    .padding(start = 16.dp)
+                    .padding(end = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "Go to Login",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = WhiteBg
+                
+                // -------------------------------
+                // CURRENT PASSWORD (NO VALIDATION)
+                // -------------------------------
+                OutlinedTextField(
+                value = currentPassword,
+                onValueChange = {
+                    currentPassword = it
+                    hasInteractedCurrent = true
+                },
+                label = { Text("Current Password") },
+                visualTransformation = if (currentPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    val tint = if (!hasInteractedCurrent || currentPassword.isEmpty()) Gray400 else Blue500
+                    IconButton(onClick = { currentPasswordVisible = !currentPasswordVisible }) {
+                        Icon(
+                            imageVector = if (currentPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = null,
+                            tint = tint
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Blue500,
+                    unfocusedBorderColor = Gray300
+                ),
+                isError = false,
+                supportingText = null
+            )
+
+            // -------------------------------
+            // NEW PASSWORD
+            // -------------------------------
+            OutlinedTextField(
+                value = newPassword,
+                onValueChange = {
+                    newPassword = it
+                    hasInteractedNew = true
+                },
+                label = { Text("New Password") },
+                visualTransformation = if (newPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    val tint = if (!hasInteractedNew || newPassword.isEmpty()) Gray400 else Blue500
+                    IconButton(onClick = { newPasswordVisible = !newPasswordVisible }) {
+                        Icon(
+                            imageVector = if (newPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = null,
+                            tint = tint
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Blue500,
+                    unfocusedBorderColor = Gray300
+                ),
+                isError = hasInteractedNew && newPassword.isNotEmpty() && !isNewPasswordValid,
+                supportingText =
+                    if (hasInteractedNew && newPassword.isNotEmpty() && !isNewPasswordValid) {
+                        {
+                            Text(
+                                text = when {
+                                    !ValidationUtils.hasNoWhitespace(newPassword) ->
+                                        "Password cannot contain spaces"
+                                    !ValidationUtils.isStrongPassword(newPassword) ->
+                                        "Password must be at least 8 characters with uppercase, lowercase, number, and special character."
+                                    else -> "Password must meet required complexity."
+                                },
+                                color = Error
+                            )
+                        }
+                    } else null
+            )
+
+            // -------------------------------
+            // CONFIRM PASSWORD
+            // -------------------------------
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = {
+                    confirmPassword = it
+                    hasInteractedConfirm = true
+                },
+                label = { Text("Confirm New Password") },
+                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    val tint = if (!hasInteractedConfirm || confirmPassword.isEmpty()) Gray400 else Blue500
+                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                        Icon(
+                            imageVector = if (confirmPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = null,
+                            tint = tint
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Blue500,
+                    unfocusedBorderColor = Gray300
+                ),
+                isError = hasInteractedConfirm && confirmPassword.isNotEmpty() && !isConfirmPasswordValid,
+                supportingText =
+                    if (hasInteractedConfirm && confirmPassword.isNotEmpty() && !isConfirmPasswordValid) {
+                        { Text("Passwords do not match", color = Error) }
+                    } else null
                 )
             }
+
+            Spacer(Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    if (isFormValid) {
+                        isLoading = true
+                        authViewModel.changePassword(currentPassword, newPassword)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(86.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 24.dp),
+                enabled = isFormValid && !isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Blue500,
+                    disabledContainerColor = Gray300
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "Change Password",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = White
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(80.dp))
         }
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        BrightCareToast(
+            toastState = toastState,
+            modifier = Modifier.padding(16.dp)
+        )
     }
 }
 
 @Preview(
     showBackground = true,
-    name = "POCO C75 - Portrait",
     widthDp = 360,
     heightDp = 740,
     showSystemUi = true
@@ -107,8 +328,6 @@ fun ChangePasswordScreen(
 @Composable
 fun ChangePasswordScreenPreview() {
     BrightCarePatientTheme {
-        ChangePasswordScreen(
-            navController = rememberNavController()
-        )
+        ChangePasswordScreen(rememberNavController())
     }
 }

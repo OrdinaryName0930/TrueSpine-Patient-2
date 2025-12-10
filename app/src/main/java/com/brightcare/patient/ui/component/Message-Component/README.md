@@ -122,3 +122,17 @@ fun MyScreen(navController: NavController) {
 - Material Design 3
 - Navigation Compose
 - BrightCare Patient Theme
+
+
+
+
+
+
+
+
+
+
+
+
+
+

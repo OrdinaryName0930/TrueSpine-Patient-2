@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.util.Log
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -24,6 +25,7 @@ import com.brightcare.patient.data.model.AuthResult
 import com.brightcare.patient.data.model.EmailVerificationState
 import com.brightcare.patient.navigation.NavigationRoutes
 import com.brightcare.patient.navigation.navigateToCompleteProfile
+import com.brightcare.patient.navigation.navigateToHome
 import com.brightcare.patient.navigation.navigateToLogin
 import com.brightcare.patient.ui.component.signup_component.*
 import com.brightcare.patient.ui.theme.*
@@ -109,16 +111,39 @@ fun PatientSignUpScreen(
                         else -> "Social"
                     }
                     
-                    toastState.showInfo(
-                        message = "Successfully signed up with $socialProvider! Complete your profile to continue.",
-                        duration = 4000L
-                    )
+                    // Check if profile is already complete
+                    Log.d("PatientSignUpScreen", "Social signup navigation check:")
+                    Log.d("PatientSignUpScreen", "  - Provider: $socialProvider")
+                    Log.d("PatientSignUpScreen", "  - User ID: ${response.userId}")
+                    Log.d("PatientSignUpScreen", "  - Profile Complete: ${response.isProfileComplete}")
                     
-                    // Wait a bit for toast to show before navigating
-                    kotlinx.coroutines.delay(1500)
-                    
-                    // Social login successful - navigate to complete profile
-                    navController.navigateToCompleteProfile(clearBackStack = true)
+                    if (response.isProfileComplete) {
+                        // Profile already complete, go to home
+                        Log.d("PatientSignUpScreen", "  - Action: Navigating to Home (profile complete)")
+                        toastState.showInfo(
+                            message = "Welcome back! Successfully signed in with $socialProvider.",
+                            duration = 3000L
+                        )
+                        
+                        // Wait a bit for toast to show before navigating
+                        kotlinx.coroutines.delay(1500)
+                        
+                        // Navigate to home since profile is already complete
+                        navController.navigateToHome(clearBackStack = true)
+                    } else {
+                        // Profile not complete, need to complete profile
+                        Log.d("PatientSignUpScreen", "  - Action: Navigating to Complete Profile (profile incomplete)")
+                        toastState.showInfo(
+                            message = "Successfully signed up with $socialProvider! Complete your profile to continue.",
+                            duration = 4000L
+                        )
+                        
+                        // Wait a bit for toast to show before navigating
+                        kotlinx.coroutines.delay(1500)
+                        
+                        // Social signup successful - navigate to complete profile
+                        navController.navigateToCompleteProfile(clearBackStack = true)
+                    }
                 }
             }
             else -> { /* Handle other states if needed */ }

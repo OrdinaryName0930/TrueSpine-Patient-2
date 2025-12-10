@@ -36,13 +36,30 @@ sealed class LoginResult {
 
 /**
  * Custom exception for login errors
+ * Enhanced with timeout and slow network handling
  */
 sealed class LoginException(message: String) : Exception(message) {
     object InvalidCredential : LoginException("Incorrect login credentials")
     object UserNotFound : LoginException("Incorrect login credentials")
     object EmailNotVerified : LoginException("Please verify your email before signing in.")
     object UserDisabled : LoginException("This user account has been disabled.")
+    
+    // Enhanced network/timeout exceptions for slow internet handling
+    object TimeoutError : LoginException("Connection timed out. Your internet may be slow. Please try again.")
+    object NoNetworkConnection : LoginException("No internet connection. Please check your network and try again.")
+    object SlowNetworkError : LoginException("Your internet connection is slow. The operation is taking longer than expected.")
+    data class RetryableError(val originalMessage: String, val attemptsMade: Int) : 
+        LoginException("Failed after $attemptsMade attempts: $originalMessage. Please try again.")
+    
     data class Unknown(val originalMessage: String) : LoginException("An unknown error occurred: $originalMessage")
+    
+    companion object {
+        /**
+         * User-friendly messages for slow connection scenarios
+         */
+        const val SLOW_NETWORK_TIP = "Tip: Move to an area with better signal or try using Wi-Fi."
+        const val RETRY_MESSAGE = "Please tap to try again."
+    }
 }
 
 // Note: SocialProvider and SocialLoginRequest are defined in patient-signup.kt
@@ -88,6 +105,7 @@ data class ProfileCompletionStatus(
 
 /**
  * Login UI state
+ * Enhanced with retry support for slow network conditions
  */
 data class LoginUiState(
     val isLoading: Boolean = false, // Keep for backward compatibility
@@ -99,7 +117,9 @@ data class LoginUiState(
     val showEmailVerificationDialog: Boolean = false,
     val profileCompletionStatus: ProfileCompletionStatus? = null,
     val errorMessage: String? = null,
-    val credentialError: String? = null // Field-level credential error (UserNotFound, InvalidCredential)
+    val credentialError: String? = null, // Field-level credential error (UserNotFound, InvalidCredential)
+    // Indicates if the error can be resolved by retrying (e.g., network issues)
+    val isRetryable: Boolean = false
 )
 
 /**

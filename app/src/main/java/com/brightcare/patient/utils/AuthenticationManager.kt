@@ -5,8 +5,9 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import javax.inject.Inject
 import javax.inject.Singleton
+import com.google.firebase.auth.FirebaseAuth
+import android.util.Log
 
 /**
  * AuthenticationManager - Handles persistent login state
@@ -16,10 +17,11 @@ import javax.inject.Singleton
  * Nag-manage ng user authentication state sa lahat ng app sessions
  */
 @Singleton
-class AuthenticationManager @Inject constructor(
+class AuthenticationManager(
     private val context: Context
 ) {
     companion object {
+        private const val TAG = "AuthenticationManager"
         private const val PREFS_NAME = "brightcare_auth_prefs"
         private const val KEY_IS_LOGGED_IN = "is_logged_in"
         private const val KEY_USER_ID = "user_id"
@@ -29,6 +31,9 @@ class AuthenticationManager @Inject constructor(
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_LOGIN_TIMESTAMP = "login_timestamp"
     }
+    
+    // Firebase Auth instance
+    private val firebaseAuth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
 
     // SharedPreferences for storing authentication data
     private val sharedPreferences: SharedPreferences by lazy {
@@ -54,7 +59,21 @@ class AuthenticationManager @Inject constructor(
      * Tingnan kung naka-login ang user
      */
     private fun checkLoginState(): Boolean {
-        return sharedPreferences.getBoolean(KEY_IS_LOGGED_IN, false)
+        val localLoginState = sharedPreferences.getBoolean(KEY_IS_LOGGED_IN, false)
+        val firebaseUser = firebaseAuth.currentUser
+        
+        // Both local state and Firebase Auth must be valid
+        val isActuallyLoggedIn = localLoginState && firebaseUser != null
+        
+        // If there's a mismatch, clear local state to stay in sync
+        if (localLoginState && firebaseUser == null) {
+            Log.w(TAG, "Local login state is true but Firebase user is null. Clearing local state.")
+            clearLoginState()
+            return false
+        }
+        
+        Log.d(TAG, "Login state check - Local: $localLoginState, Firebase: ${firebaseUser != null}, Result: $isActuallyLoggedIn")
+        return isActuallyLoggedIn
     }
 
     /**
@@ -210,18 +229,53 @@ class AuthenticationManager @Inject constructor(
      * I-refresh ang authentication state
      */
     fun refreshAuthState() {
+        Log.d(TAG, "Refreshing authentication state...")
         val isLoggedIn = checkLoginState()
         _isLoggedIn.value = isLoggedIn
         
         if (isLoggedIn) {
-            _currentUserId.value = getCurrentUserId()
-            _currentUserEmail.value = getCurrentUserEmail()
-            _currentUserName.value = getCurrentUserName()
+            val userId = getCurrentUserId()
+            val userEmail = getCurrentUserEmail()
+            val userName = getCurrentUserName()
+            
+            _currentUserId.value = userId
+            _currentUserEmail.value = userEmail
+            _currentUserName.value = userName
+            
+            Log.d(TAG, "User is logged in - ID: $userId, Email: $userEmail")
         } else {
             _currentUserId.value = null
             _currentUserEmail.value = null
             _currentUserName.value = null
+            Log.d(TAG, "User is not logged in")
         }
+    }
+    
+    /**
+     * Sync with Firebase Auth state on app startup
+     * I-sync ang Firebase Auth state sa app startup
+     */
+    fun syncWithFirebaseAuth() {
+        Log.d(TAG, "Syncing with Firebase Auth state...")
+        val firebaseUser = firebaseAuth.currentUser
+        val localLoginState = sharedPreferences.getBoolean(KEY_IS_LOGGED_IN, false)
+        
+        if (firebaseUser != null && !localLoginState) {
+            // Firebase user exists but local state is false - restore local state
+            Log.d(TAG, "Firebase user exists, restoring local login state")
+            saveLoginState(
+                userId = firebaseUser.uid,
+                userEmail = firebaseUser.email ?: "",
+                userName = firebaseUser.displayName ?: ""
+            )
+        } else if (firebaseUser == null && localLoginState) {
+            // Local state says logged in but Firebase user is null - clear local state
+            Log.d(TAG, "Firebase user is null, clearing local login state")
+            clearLoginState()
+        }
+        
+        // Refresh state after sync
+        refreshAuthState()
     }
 }
 

@@ -5,9 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.brightcare.patient.data.repository.ChiropractorRepository
 import com.brightcare.patient.ui.component.chirocomponents.ChiropractorInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -15,6 +14,7 @@ import javax.inject.Inject
  * ViewModel for managing chiropractor data and UI state
  * Handles data fetching from repository and provides state to UI
  */
+@OptIn(FlowPreview::class)
 @HiltViewModel
 class ChiropractorViewModel @Inject constructor(
     private val chiropractorRepository: ChiropractorRepository
@@ -24,7 +24,10 @@ class ChiropractorViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChiropractorUiState())
     val uiState: StateFlow<ChiropractorUiState> = _uiState.asStateFlow()
     
-    // Chiropractors list
+    // All chiropractors (unfiltered)
+    private val _allChiropractors = MutableStateFlow<List<ChiropractorInfo>>(emptyList())
+    
+    // Filtered chiropractors list (displayed to UI)
     private val _chiropractors = MutableStateFlow<List<ChiropractorInfo>>(emptyList())
     val chiropractors: StateFlow<List<ChiropractorInfo>> = _chiropractors.asStateFlow()
     
@@ -48,6 +51,7 @@ class ChiropractorViewModel @Inject constructor(
     
     init {
         loadChiropractors()
+        setupSearch()
     }
     
     /**
@@ -60,6 +64,7 @@ class ChiropractorViewModel @Inject constructor(
             
             chiropractorRepository.getAllChiropractors()
                 .onSuccess { chiropractorsList ->
+                    _allChiropractors.value = chiropractorsList
                     _chiropractors.value = chiropractorsList
                     _uiState.value = _uiState.value.copy(
                         chiropractors = chiropractorsList,
@@ -79,6 +84,50 @@ class ChiropractorViewModel @Inject constructor(
         }
     }
     
+    /**
+     * Setup real-time search functionality
+     * I-setup ang real-time search functionality
+     */
+    private fun setupSearch() {
+        _searchQuery
+            .debounce(300) // Wait 300ms after user stops typing
+            .distinctUntilChanged()
+            .combine(_allChiropractors) { query, allChiropractors ->
+                if (query.isBlank()) {
+                    allChiropractors
+                } else {
+                    allChiropractors.filter { chiropractor ->
+                        chiropractor.name.contains(query, ignoreCase = true) ||
+                        chiropractor.specialization.contains(query, ignoreCase = true) ||
+                        chiropractor.location.contains(query, ignoreCase = true)
+                    }
+                }
+            }
+            .onEach { filteredList ->
+                _chiropractors.value = filteredList
+                _uiState.value = _uiState.value.copy(
+                    chiropractors = filteredList
+                )
+            }
+            .launchIn(viewModelScope)
+    }
+    
+    /**
+     * Update search query
+     * I-update ang search query
+     */
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+    
+    /**
+     * Clear search
+     * I-clear ang search
+     */
+    fun clearSearch() {
+        _searchQuery.value = ""
+    }
+
     /**
      * Search chiropractors by specialization
      */
@@ -127,38 +176,33 @@ class ChiropractorViewModel @Inject constructor(
      */
     private fun applyFilters() {
         viewModelScope.launch {
-            _isLoading.value = true
+            var filteredList = _allChiropractors.value
             
-            chiropractorRepository.getAllChiropractors()
-                .onSuccess { allChiropractors ->
-                    var filteredList = allChiropractors
-                    
-                    // Apply available filter
-                    if (_showAvailableOnly.value) {
-                        filteredList = filteredList.filter { it.isAvailable }
-                    }
-                    
-                    // Apply near me filter (dummy implementation - filter by common locations)
-                    if (_showNearMeOnly.value) {
-                        val nearbyLocations = listOf("Makati City", "Quezon City", "Manila", "Pasig City")
-                        filteredList = filteredList.filter { it.location in nearbyLocations }
-                    }
-                    
-                    _chiropractors.value = filteredList
-                    _uiState.value = _uiState.value.copy(
-                        chiropractors = filteredList,
-                        isLoading = false
-                    )
+            // Apply search query filter
+            val query = _searchQuery.value
+            if (query.isNotBlank()) {
+                filteredList = filteredList.filter { chiropractor ->
+                    chiropractor.name.contains(query, ignoreCase = true) ||
+                    chiropractor.specialization.contains(query, ignoreCase = true) ||
+                    chiropractor.location.contains(query, ignoreCase = true)
                 }
-                .onFailure { exception ->
-                    _errorMessage.value = "Filter failed: ${exception.message}"
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = exception.message
-                    )
-                }
+            }
             
-            _isLoading.value = false
+            // Apply available filter
+            if (_showAvailableOnly.value) {
+                filteredList = filteredList.filter { it.isAvailable }
+            }
+            
+            // Apply near me filter (dummy implementation - filter by common locations)
+            if (_showNearMeOnly.value) {
+                val nearbyLocations = listOf("Makati City", "Quezon City", "Manila", "Pasig City")
+                filteredList = filteredList.filter { it.location in nearbyLocations }
+            }
+            
+            _chiropractors.value = filteredList
+            _uiState.value = _uiState.value.copy(
+                chiropractors = filteredList
+            )
         }
     }
     

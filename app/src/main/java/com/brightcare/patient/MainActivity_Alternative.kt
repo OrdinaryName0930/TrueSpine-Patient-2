@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
@@ -57,6 +58,7 @@ class MainActivity_Alternative : ComponentActivity() {
                     modifier = Modifier.fillMaxSize()
                 ) { innerPadding ->
                     AuthenticationWrapper(
+                        modifier = Modifier.padding(innerPadding),
                         navController = navController,
                         authenticationManager = authenticationManager,
                         onFinishActivity = { finish() }

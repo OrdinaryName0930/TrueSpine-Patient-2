@@ -8,226 +8,111 @@ import java.util.*
  */
 
 /**
- * Get sample conversations data for testing and preview
- * Kumuha ng sample conversation data para sa testing at preview
- * TEMPORARY DUMP DATA - More conversations for better visibility
- */
-fun getSampleConversations(): List<ChatConversation> {
-    val calendar = Calendar.getInstance()
-    return listOf(
-        ChatConversation(
-            id = "1",
-            participantName = "Dr. Maria Santos",
-            participantType = SenderType.DOCTOR,
-            lastMessage = "Your next appointment is confirmed for tomorrow at 10 AM. Please arrive 15 minutes early.",
-            lastMessageTime = calendar.apply { add(Calendar.HOUR, -2) }.time,
-            unreadCount = 2,
-            isOnline = true
-        ),
-        ChatConversation(
-            id = "2",
-            participantName = "Dr. John Reyes",
-            participantType = SenderType.DOCTOR,
-            lastMessage = "The X-ray results look good. Continue with the prescribed exercises.",
-            lastMessageTime = calendar.apply { add(Calendar.DAY_OF_MONTH, -1) }.time,
-            unreadCount = 0,
-            isOnline = false
-        ),
-        ChatConversation(
-            id = "3",
-            participantName = "BrightCare Support",
-            participantType = SenderType.ADMIN,
-            lastMessage = "Thank you for your feedback. We'll improve our services based on your suggestions.",
-            lastMessageTime = calendar.apply { add(Calendar.DAY_OF_MONTH, -3) }.time,
-            unreadCount = 1,
-            isOnline = true
-        ),
-        ChatConversation(
-            id = "4",
-            participantName = "Dr. Ana Cruz",
-            participantType = SenderType.DOCTOR,
-            lastMessage = "Please follow the home care instructions I sent you.",
-            lastMessageTime = calendar.apply { add(Calendar.WEEK_OF_YEAR, -1) }.time,
-            unreadCount = 0,
-            isOnline = true
-        ),
-        // ADDITIONAL DUMP DATA FOR BETTER VISIBILITY
-        ChatConversation(
-            id = "5",
-            participantName = "Dr. Michael Chen",
-            participantType = SenderType.DOCTOR,
-            lastMessage = "Your blood test results are ready. Everything looks normal. Great job on maintaining your health!",
-            lastMessageTime = calendar.apply { add(Calendar.HOUR, -5) }.time,
-            unreadCount = 3,
-            isOnline = true
-        ),
-        ChatConversation(
-            id = "6",
-            participantName = "Nurse Patricia",
-            participantType = SenderType.ADMIN,
-            lastMessage = "Reminder: Please take your medication before meals as prescribed by your doctor.",
-            lastMessageTime = calendar.apply { add(Calendar.HOUR, -8) }.time,
-            unreadCount = 1,
-            isOnline = false
-        ),
-        ChatConversation(
-            id = "7",
-            participantName = "Dr. Sarah Johnson",
-            participantType = SenderType.DOCTOR,
-            lastMessage = "How are you feeling after the physical therapy session? Any pain or discomfort?",
-            lastMessageTime = calendar.apply { add(Calendar.DAY_OF_MONTH, -2) }.time,
-            unreadCount = 0,
-            isOnline = true
-        ),
-        ChatConversation(
-            id = "8",
-            participantName = "BrightCare Pharmacy",
-            participantType = SenderType.ADMIN,
-            lastMessage = "Your prescription is ready for pickup. Store hours: 9 AM - 7 PM.",
-            lastMessageTime = calendar.apply { add(Calendar.HOUR, -12) }.time,
-            unreadCount = 2,
-            isOnline = false
-        ),
-        ChatConversation(
-            id = "9",
-            participantName = "Dr. Robert Kim",
-            participantType = SenderType.DOCTOR,
-            lastMessage = "The MRI scan shows significant improvement. Keep up with the treatment plan.",
-            lastMessageTime = calendar.apply { add(Calendar.DAY_OF_MONTH, -4) }.time,
-            unreadCount = 0,
-            isOnline = false
-        ),
-        ChatConversation(
-            id = "10",
-            participantName = "Emergency Support",
-            participantType = SenderType.ADMIN,
-            lastMessage = "This is a 24/7 emergency support line. How can we assist you today?",
-            lastMessageTime = calendar.apply { add(Calendar.WEEK_OF_YEAR, -2) }.time,
-            unreadCount = 0,
-            isOnline = true
-        ),
-        ChatConversation(
-            id = "11",
-            participantName = "Dr. Lisa Wong",
-            participantType = SenderType.DOCTOR,
-            lastMessage = "Your vaccination is scheduled for next week. Please bring your ID and insurance card.",
-            lastMessageTime = calendar.apply { add(Calendar.DAY_OF_MONTH, -6) }.time,
-            unreadCount = 1,
-            isOnline = true
-        ),
-        ChatConversation(
-            id = "12",
-            participantName = "Appointment Scheduler",
-            participantType = SenderType.ADMIN,
-            lastMessage = "Your appointment has been rescheduled to Friday 2 PM. Please confirm your availability.",
-            lastMessageTime = calendar.apply { add(Calendar.HOUR, -18) }.time,
-            unreadCount = 4,
-            isOnline = false
-        )
-    )
-}
-
-/**
- * Filter conversations by selected tab
- * I-filter ang mga conversation base sa selected tab
- */
-fun filterConversationsByTab(selectedTab: Int, conversations: List<ChatConversation>): List<ChatConversation> {
-    return when (selectedTab) {
-        0 -> conversations // All chats - Lahat ng chat
-        1 -> conversations.filter { it.participantType == SenderType.DOCTOR } // Doctors only
-        2 -> conversations.filter { it.participantType == SenderType.ADMIN } // Support only
-        else -> conversations
-    }
-}
-
-/**
- * Format time for conversation display
- * I-format ang oras para sa conversation display
+ * Format conversation timestamp for display
+ * I-format ang conversation timestamp para sa display
  */
 fun formatConversationTime(timestamp: Date): String {
-    val now = Calendar.getInstance()
-    val messageTime = Calendar.getInstance().apply { time = timestamp }
+    val now = System.currentTimeMillis()
+    val messageTime = timestamp.time
+    val diff = now - messageTime
     
-    val timeFormat = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
-    val dateFormat = java.text.SimpleDateFormat("MMM dd", Locale.getDefault())
-    
-    return if (now.get(Calendar.DAY_OF_YEAR) == messageTime.get(Calendar.DAY_OF_YEAR) &&
-        now.get(Calendar.YEAR) == messageTime.get(Calendar.YEAR)) {
-        timeFormat.format(timestamp)
-    } else {
-        dateFormat.format(timestamp)
+    return when {
+        diff < 60_000 -> "Just now" // Less than 1 minute
+        diff < 3600_000 -> "${diff / 60_000}m" // Less than 1 hour
+        diff < 86400_000 -> "${diff / 3600_000}h" // Less than 1 day
+        diff < 604800_000 -> "${diff / 86400_000}d" // Less than 1 week
+        else -> {
+            val date = java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault())
+            date.format(timestamp)
+        }
     }
 }
 
 /**
- * Search conversations by query string
- * Maghanap ng mga conversation gamit ang query string
+ * Get conversation preview text
+ * Kunin ang conversation preview text
  */
-fun searchConversations(
-    conversations: List<ChatConversation>,
-    query: String,
-    senderTypeFilter: SenderType? = null
-): List<ChatConversation> {
-    if (query.isBlank() && senderTypeFilter == null) {
-        return conversations
-    }
-    
-    return conversations.filter { conversation ->
-        val matchesQuery = if (query.isBlank()) {
-            true
-        } else {
-            conversation.participantName.contains(query, ignoreCase = true) ||
-            conversation.lastMessage.contains(query, ignoreCase = true)
-        }
-        
-        val matchesSenderType = senderTypeFilter?.let { filter ->
-            conversation.participantType == filter
-        } ?: true
-        
-        matchesQuery && matchesSenderType
+fun getConversationPreview(lastMessage: String, messageType: String = "TEXT"): String {
+    return when (messageType.uppercase()) {
+        "IMAGE" -> "📷 Photo"
+        "FILE" -> "📎 File"
+        "AUDIO" -> "🎵 Audio"
+        "VIDEO" -> "🎥 Video"
+        "DOCUMENT" -> "📄 Document"
+        else -> lastMessage.take(50) + if (lastMessage.length > 50) "..." else ""
     }
 }
 
 /**
- * Get search suggestions based on conversations
- * Kumuha ng mga search suggestion base sa mga conversation
+ * Get unread count display text
+ * Kunin ang unread count display text
  */
-fun getSearchSuggestions(
-    conversations: List<ChatConversation>,
-    query: String,
-    maxSuggestions: Int = 5
-): List<String> {
-    if (query.isBlank()) return emptyList()
-    
-    val suggestions = mutableSetOf<String>()
-    
-    // Add participant names that match
-    conversations.forEach { conversation ->
-        if (conversation.participantName.contains(query, ignoreCase = true)) {
-            suggestions.add(conversation.participantName)
-        }
+fun getUnreadCountText(count: Int): String {
+    return when {
+        count == 0 -> ""
+        count < 100 -> count.toString()
+        else -> "99+"
     }
-    
-    // Add common search terms
-    val commonTerms = listOf("appointment", "results", "prescription", "follow-up", "emergency")
-    commonTerms.forEach { term ->
-        if (term.contains(query, ignoreCase = true)) {
-            suggestions.add(term)
-        }
-    }
-    
-    return suggestions.take(maxSuggestions)
 }
 
 /**
- * Highlight search query in text
- * I-highlight ang search query sa text
+ * Check if conversation is recent (within 24 hours)
+ * I-check kung ang conversation ay recent (within 24 hours)
  */
-fun highlightSearchQuery(text: String, query: String): String {
-    if (query.isBlank()) return text
-    
-    return text.replace(
-        query.toRegex(RegexOption.IGNORE_CASE),
-        "<b>$query</b>"
+fun isRecentConversation(timestamp: Date): Boolean {
+    val now = System.currentTimeMillis()
+    val messageTime = timestamp.time
+    val diff = now - messageTime
+    return diff < 86400_000 // 24 hours
+}
+
+/**
+ * Get sender type display name
+ * Kunin ang sender type display name
+ */
+fun getSenderTypeDisplayName(senderType: SenderType): String {
+    return when (senderType) {
+        SenderType.DOCTOR -> "Doctor"
+        SenderType.PATIENT -> "Patient"
+        SenderType.ADMIN -> "Admin"
+    }
+}
+
+/**
+ * Sort conversations by priority (unread first, then by time)
+ * I-sort ang conversations ayon sa priority (unread muna, then by time)
+ */
+fun sortConversationsByPriority(conversations: List<ChatConversation>): List<ChatConversation> {
+    return conversations.sortedWith(
+        compareByDescending<ChatConversation> { it.unreadCount > 0 }
+            .thenByDescending { it.lastMessageTime }
     )
+}
+
+/**
+ * Filter conversations by search query
+ * I-filter ang conversations gamit ang search query
+ */
+fun filterConversations(
+    conversations: List<ChatConversation>,
+    searchQuery: String
+): List<ChatConversation> {
+    if (searchQuery.isBlank()) return conversations
+    
+    val query = searchQuery.lowercase().trim()
+    return conversations.filter { conversation ->
+        conversation.participantName.lowercase().contains(query) ||
+        conversation.lastMessage.lowercase().contains(query)
+    }
+}
+
+/**
+ * Get conversation status text
+ * Kunin ang conversation status text
+ */
+fun getConversationStatusText(conversation: ChatConversation): String {
+    return when {
+        conversation.isOnline -> "Online"
+        else -> "Offline"
+    }
 }

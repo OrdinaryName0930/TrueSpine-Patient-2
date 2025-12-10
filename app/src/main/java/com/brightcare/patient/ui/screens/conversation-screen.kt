@@ -5,12 +5,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import com.brightcare.patient.ui.component.conversationcomponent.ConversationComponent
+import com.brightcare.patient.ui.screens.ChatScreen
 import com.brightcare.patient.ui.theme.BrightCarePatientTheme
 
 /**
- * Conversation Screen - Individual chat conversation using ConversationComponent
- * Screen para sa individual na chat conversation gamit ang ConversationComponent
+ * Conversation Screen - Individual chat conversation using ChatScreen
+ * Screen para sa individual na chat conversation gamit ang ChatScreen
  */
 @Composable
 fun ConversationScreen(
@@ -18,13 +18,12 @@ fun ConversationScreen(
     navController: NavController,
     modifier: Modifier = Modifier
 ) {
-    // Use the new ConversationComponent with all functionality
-    // Gamitin ang bagong ConversationComponent na may lahat ng functionality
-    ConversationComponent(
+    // Use the ChatScreen for individual conversations
+    // Gamitin ang ChatScreen para sa individual conversations
+    ChatScreen(
         conversationId = conversationId,
         navController = navController,
-        modifier = modifier,
-        onBackClick = { navController.popBackStack() }
+        modifier = modifier
     )
 }
 
@@ -47,3 +46,10 @@ fun ConversationScreenPreview() {
         )
     }
 }
+
+
+
+
+
+
+

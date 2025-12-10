@@ -32,7 +32,11 @@ data class ChatConversation(
     val lastMessage: String,
     val lastMessageTime: Date,
     val unreadCount: Int,
-    val isOnline: Boolean
+    val isOnline: Boolean,
+    val profileImageUrl: String? = null, // Added for displaying actual profile images
+    val hasNewMessage: Boolean = false, // Added to indicate if there are new/unread messages
+    val phoneNumber: String? = null, // Added for phone call functionality
+    val specialization: String? = null // Added for displaying chiropractor specialization
 )
 
 /**
@@ -44,3 +48,10 @@ enum class SenderType {
     PATIENT,    // Mga pasyente
     ADMIN       // Mga admin/support
 }
+
+
+
+
+
+
+

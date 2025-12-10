@@ -14,11 +14,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.brightcare.patient.ui.component.messagecomponent.*
 import com.brightcare.patient.ui.theme.*
 import java.text.SimpleDateFormat
@@ -34,7 +37,8 @@ fun MessageBubble(
     isFromCurrentUser: Boolean,
     modifier: Modifier = Modifier,
     onImageClick: (String) -> Unit = {},
-    onAttachmentClick: (MessageAttachment) -> Unit = {}
+    onAttachmentClick: (MessageAttachment) -> Unit = {},
+    onDownloadClick: (MessageAttachment) -> Unit = {}
 ) {
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     
@@ -80,35 +84,40 @@ fun MessageBubble(
                             ImageAttachment(
                                 attachment = attachment,
                                 isFromCurrentUser = isFromCurrentUser,
-                                onImageClick = onImageClick
+                                onImageClick = onImageClick,
+                                onDownloadClick = onDownloadClick
                             )
                         }
                         AttachmentType.FILE -> {
                             FileAttachment(
                                 attachment = attachment,
                                 isFromCurrentUser = isFromCurrentUser,
-                                onAttachmentClick = onAttachmentClick
+                                onAttachmentClick = onAttachmentClick,
+                                onDownloadClick = onDownloadClick
                             )
                         }
                         AttachmentType.VIDEO -> {
                             FileAttachment(
                                 attachment = attachment,
                                 isFromCurrentUser = isFromCurrentUser,
-                                onAttachmentClick = onAttachmentClick
+                                onAttachmentClick = onAttachmentClick,
+                                onDownloadClick = onDownloadClick
                             )
                         }
                         AttachmentType.AUDIO -> {
                             FileAttachment(
                                 attachment = attachment,
                                 isFromCurrentUser = isFromCurrentUser,
-                                onAttachmentClick = onAttachmentClick
+                                onAttachmentClick = onAttachmentClick,
+                                onDownloadClick = onDownloadClick
                             )
                         }
                         AttachmentType.DOCUMENT -> {
                             FileAttachment(
                                 attachment = attachment,
                                 isFromCurrentUser = isFromCurrentUser,
-                                onAttachmentClick = onAttachmentClick
+                                onAttachmentClick = onAttachmentClick,
+                                onDownloadClick = onDownloadClick
                             )
                         }
                     }
@@ -158,47 +167,112 @@ private fun ImageAttachment(
     attachment: MessageAttachment,
     isFromCurrentUser: Boolean,
     onImageClick: (String) -> Unit,
+    onDownloadClick: (MessageAttachment) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onImageClick(attachment.url) },
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (isFromCurrentUser) White.copy(alpha = 0.1f) else Gray50
         ),
         shape = RoundedCornerShape(8.dp)
     ) {
         Column {
-            // Image placeholder (in real implementation, use AsyncImage from Coil)
+            // Image with AsyncImage from Coil
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(150.dp)
-                    .background(
-                        if (isFromCurrentUser) White.copy(alpha = 0.2f) else Gray100,
-                        RoundedCornerShape(8.dp)
-                    ),
-                contentAlignment = Alignment.Center
+                    .height(200.dp)
+                    .clickable { onImageClick(attachment.url) }
             ) {
-                Icon(
-                    imageVector = Icons.Default.Image,
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(attachment.url)
+                        .crossfade(true)
+                        .build(),
                     contentDescription = "Image / Larawan",
-                    tint = if (isFromCurrentUser) White.copy(alpha = 0.7f) else Gray500,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(android.R.drawable.ic_menu_gallery),
+                    placeholder = painterResource(android.R.drawable.ic_menu_gallery)
                 )
+                
+                // View/Download overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Color.Black.copy(alpha = 0.3f),
+                            RoundedCornerShape(8.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // View button
+                        IconButton(
+                            onClick = { onImageClick(attachment.url) },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Visibility,
+                                contentDescription = "View / Tingnan",
+                                tint = White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        
+                        // Download button
+                        IconButton(
+                            onClick = { onDownloadClick(attachment) },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "Download / I-download",
+                                tint = White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
             }
             
-            // Image name
+            // Image name and size
             if (attachment.name.isNotEmpty()) {
-                Text(
-                    text = attachment.name,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = if (isFromCurrentUser) White.copy(alpha = 0.9f) else Gray700,
-                        fontSize = 11.sp
-                    ),
-                    modifier = Modifier.padding(8.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = attachment.name,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = if (isFromCurrentUser) White.copy(alpha = 0.9f) else Gray700,
+                            fontSize = 11.sp
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    if (attachment.size > 0) {
+                        Text(
+                            text = formatFileSize(attachment.size),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = if (isFromCurrentUser) White.copy(alpha = 0.7f) else Gray500,
+                                fontSize = 10.sp
+                            )
+                        )
+                    }
+                }
             }
         }
     }
@@ -213,12 +287,11 @@ private fun FileAttachment(
     attachment: MessageAttachment,
     isFromCurrentUser: Boolean,
     onAttachmentClick: (MessageAttachment) -> Unit,
+    onDownloadClick: (MessageAttachment) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onAttachmentClick(attachment) },
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (isFromCurrentUser) White.copy(alpha = 0.1f) else Gray50
         ),
@@ -236,11 +309,12 @@ private fun FileAttachment(
                     attachment.name.endsWith(".pdf", ignoreCase = true) -> Icons.Default.PictureAsPdf
                     attachment.name.endsWith(".doc", ignoreCase = true) || 
                     attachment.name.endsWith(".docx", ignoreCase = true) -> Icons.Default.Description
+                    attachment.mimeType.startsWith("image/") -> Icons.Default.Image
                     else -> Icons.Default.AttachFile
                 },
                 contentDescription = "File / File",
                 tint = if (isFromCurrentUser) White.copy(alpha = 0.8f) else Blue500,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(32.dp)
             )
             
             Spacer(modifier = Modifier.width(12.dp))
@@ -255,27 +329,67 @@ private fun FileAttachment(
                         color = if (isFromCurrentUser) White else Gray900,
                         fontWeight = FontWeight.Medium
                     ),
-                    maxLines = 1
+                    maxLines = 2
                 )
                 
                 if (attachment.size > 0) {
                     Text(
-                        text = com.brightcare.patient.ui.component.conversationcomponent.formatFileSize(attachment.size),
+                        text = formatFileSize(attachment.size),
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = if (isFromCurrentUser) White.copy(alpha = 0.8f) else Gray600,
                             fontSize = 11.sp
                         )
                     )
                 }
+                
+                // MIME type info
+                if (attachment.mimeType.isNotEmpty()) {
+                    Text(
+                        text = attachment.mimeType,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = if (isFromCurrentUser) White.copy(alpha = 0.6f) else Gray500,
+                            fontSize = 10.sp
+                        )
+                    )
+                }
             }
             
-            // Download icon
-            Icon(
-                imageVector = Icons.Default.Download,
-                contentDescription = "Download / I-download",
-                tint = if (isFromCurrentUser) White.copy(alpha = 0.8f) else Gray600,
-                modifier = Modifier.size(16.dp)
-            )
+            // Action buttons
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // View/Open button
+                IconButton(
+                    onClick = { onAttachmentClick(attachment) },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = if (isFromCurrentUser) White.copy(alpha = 0.2f) else Blue100
+                    ),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = "Open / Buksan",
+                        tint = if (isFromCurrentUser) White else Blue500,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                
+                // Download button
+                IconButton(
+                    onClick = { onDownloadClick(attachment) },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = if (isFromCurrentUser) White.copy(alpha = 0.2f) else Green100
+                    ),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Download / I-download",
+                        tint = if (isFromCurrentUser) White else Green500,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
         }
     }
 }

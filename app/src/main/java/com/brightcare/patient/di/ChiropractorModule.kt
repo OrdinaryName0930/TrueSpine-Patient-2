@@ -1,6 +1,8 @@
 package com.brightcare.patient.di
 
 import com.brightcare.patient.data.repository.ChiropractorRepository
+import com.brightcare.patient.data.repository.ChiropractorProfileRepository
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,6 +20,14 @@ object ChiropractorModule {
     @Singleton
     fun provideChiropractorRepository(): ChiropractorRepository {
         return ChiropractorRepository()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideChiropractorProfileRepository(
+        firestore: FirebaseFirestore
+    ): ChiropractorProfileRepository {
+        return ChiropractorProfileRepository(firestore)
     }
 }
 

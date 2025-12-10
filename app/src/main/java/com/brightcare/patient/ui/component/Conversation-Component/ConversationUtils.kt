@@ -8,424 +8,160 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.VideoLibrary
-import java.util.*
+import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
- * Utility functions for conversation components and Firestore operations
- * Mga utility function para sa conversation components at Firestore operations
+ * Utility functions for conversation components
+ * Mga utility function para sa conversation components
  */
 
 /**
- * Get sample conversation by ID (temporary implementation)
- * Kumuha ng sample conversation gamit ang ID (temporary implementation)
+ * Get icon for attachment type
+ * Kunin ang icon para sa attachment type
  */
-fun getSampleConversationById(conversationId: String): ChatConversation {
-    val conversations = getSampleConversations()
-    return conversations.find { it.id == conversationId } ?: conversations.first()
-}
-
-/**
- * Get sample conversations (temporary implementation)
- * Kumuha ng sample conversations (temporary implementation)
- */
-fun getSampleConversations(): List<ChatConversation> {
-    val calendar = Calendar.getInstance()
-    return listOf(
-        ChatConversation(
-            id = "1",
-            participantName = "Dr. Maria Santos",
-            participantType = SenderType.DOCTOR,
-            participantId = "doctor_maria",
-            lastMessage = "Your next appointment is confirmed for tomorrow at 10 AM.",
-            lastMessageTime = calendar.apply { add(Calendar.MINUTE, -30) }.time,
-            unreadCount = 1,
-            isOnline = true,
-            conversationType = ConversationType.DIRECT
-        ),
-        ChatConversation(
-            id = "2",
-            participantName = "Dr. John Reyes",
-            participantType = SenderType.DOCTOR,
-            participantId = "doctor_john",
-            lastMessage = "The X-ray results look good. Continue with the prescribed exercises.",
-            lastMessageTime = calendar.apply { add(Calendar.HOUR, -2) }.time,
-            unreadCount = 0,
-            isOnline = false,
-            lastSeenTime = calendar.apply { add(Calendar.MINUTE, -45) }.time,
-            conversationType = ConversationType.DIRECT
-        ),
-        ChatConversation(
-            id = "3",
-            participantName = "BrightCare Support",
-            participantType = SenderType.ADMIN,
-            participantId = "support_team",
-            lastMessage = "Thank you for your feedback. We'll improve our services based on your suggestions.",
-            lastMessageTime = calendar.apply { add(Calendar.DAY_OF_MONTH, -1) }.time,
-            unreadCount = 2,
-            isOnline = true,
-            conversationType = ConversationType.DIRECT
-        )
-    )
-}
-
-/**
- * Get sample messages for a conversation (temporary implementation)
- * Kumuha ng sample messages para sa conversation (temporary implementation)
- */
-fun getSampleMessages(conversationId: String): List<ChatMessage> {
-    val calendar = Calendar.getInstance()
-    
-    return when (conversationId) {
-        "1" -> listOf(
-            ChatMessage(
-                id = "msg1",
-                senderId = "doctor_maria",
-                senderName = "Dr. Maria Santos",
-                senderType = SenderType.DOCTOR,
-                message = "Good morning! How are you feeling today?",
-                timestamp = calendar.apply { add(Calendar.HOUR, -2) }.time,
-                isRead = true
-            ),
-            ChatMessage(
-                id = "msg2",
-                senderId = "current_user",
-                senderName = "You",
-                senderType = SenderType.PATIENT,
-                message = "Hi Doctor! I'm feeling much better, thank you. The medication is working well.",
-                timestamp = calendar.apply { add(Calendar.MINUTE, 5) }.time,
-                isRead = true
-            ),
-            ChatMessage(
-                id = "msg3",
-                senderId = "current_user",
-                senderName = "You",
-                senderType = SenderType.PATIENT,
-                message = "Here's the X-ray you requested",
-                timestamp = calendar.apply { add(Calendar.MINUTE, 10) }.time,
-                isRead = true,
-                attachments = listOf(
-                    MessageAttachment(
-                        id = "att1",
-                        name = "xray_chest_2024.jpg",
-                        url = "https://example.com/xray.jpg",
-                        type = AttachmentType.IMAGE,
-                        size = 1024000,
-                        mimeType = "image/jpeg"
-                    )
-                )
-            ),
-            ChatMessage(
-                id = "msg4",
-                senderId = "doctor_maria",
-                senderName = "Dr. Maria Santos",
-                senderType = SenderType.DOCTOR,
-                message = "Perfect! The X-ray looks clear. Your next appointment is confirmed for tomorrow at 10 AM. Please arrive 15 minutes early.",
-                timestamp = calendar.apply { add(Calendar.MINUTE, 2) }.time,
-                isRead = false
-            )
-        )
-        "2" -> listOf(
-            ChatMessage(
-                id = "msg5",
-                senderId = "doctor_john",
-                senderName = "Dr. John Reyes",
-                senderType = SenderType.DOCTOR,
-                message = "Hello! I've reviewed your X-ray results.",
-                timestamp = calendar.apply { add(Calendar.DAY_OF_MONTH, -1) }.time,
-                isRead = true
-            ),
-            ChatMessage(
-                id = "msg6",
-                senderId = "doctor_john",
-                senderName = "Dr. John Reyes",
-                senderType = SenderType.DOCTOR,
-                message = "The X-ray results look good. Continue with the prescribed exercises.",
-                timestamp = calendar.apply { add(Calendar.MINUTE, 1) }.time,
-                isRead = true,
-                attachments = listOf(
-                    MessageAttachment(
-                        id = "att2",
-                        name = "exercise_plan.pdf",
-                        url = "https://example.com/exercise_plan.pdf",
-                        type = AttachmentType.FILE,
-                        size = 512000,
-                        mimeType = "application/pdf"
-                    )
-                )
-            ),
-            ChatMessage(
-                id = "msg7",
-                senderId = "current_user",
-                senderName = "You",
-                senderType = SenderType.PATIENT,
-                message = "Thank you doctor! Should I continue with the same routine?",
-                timestamp = calendar.apply { add(Calendar.MINUTE, 30) }.time,
-                isRead = true
-            )
-        )
-        "3" -> listOf(
-            ChatMessage(
-                id = "msg8",
-                senderId = "support_team",
-                senderName = "BrightCare Support",
-                senderType = SenderType.ADMIN,
-                message = "Hello! Thank you for contacting BrightCare support. How can we help you today?",
-                timestamp = calendar.apply { add(Calendar.DAY_OF_MONTH, -3) }.time,
-                isRead = true
-            ),
-            ChatMessage(
-                id = "msg9",
-                senderId = "current_user",
-                senderName = "You",
-                senderType = SenderType.PATIENT,
-                message = "Hi! I have some feedback about the app's user interface.",
-                timestamp = calendar.apply { add(Calendar.MINUTE, 10) }.time,
-                isRead = true
-            ),
-            ChatMessage(
-                id = "msg10",
-                senderId = "support_team",
-                senderName = "BrightCare Support",
-                senderType = SenderType.ADMIN,
-                message = "Thank you for your feedback. We'll improve our services based on your suggestions.",
-                timestamp = calendar.apply { add(Calendar.MINUTE, 5) }.time,
-                isRead = false
-            )
-        )
-        else -> listOf(
-            ChatMessage(
-                id = "msg11",
-                senderId = "doctor_ana",
-                senderName = "Dr. Ana Cruz",
-                senderType = SenderType.DOCTOR,
-                message = "Please follow the home care instructions I sent you.",
-                timestamp = calendar.apply { add(Calendar.WEEK_OF_YEAR, -1) }.time,
-                isRead = true
-            )
-        )
+fun getAttachmentIcon(attachmentType: AttachmentType): ImageVector {
+    return when (attachmentType) {
+        AttachmentType.IMAGE -> Icons.Default.Image
+        AttachmentType.VIDEO -> Icons.Default.VideoLibrary
+        AttachmentType.AUDIO -> Icons.Default.AudioFile
+        AttachmentType.DOCUMENT -> Icons.Default.Description
+        AttachmentType.FILE -> Icons.Default.AttachFile
     }
 }
 
 /**
- * Firestore operations class (placeholder for future implementation)
- * Firestore operations class (placeholder para sa future implementation)
+ * Get file extension from filename
+ * Kunin ang file extension mula sa filename
  */
-class ConversationFirestoreManager {
-    
-    /**
-     * Send message to Firestore
-     * Magpadala ng message sa Firestore
-     */
-    suspend fun sendMessage(
-        conversationId: String,
-        message: ChatMessage
-    ): Result<ChatMessage> {
-        return try {
-            // TODO: Implement Firestore message sending
-            /*
-            val db = FirebaseFirestore.getInstance()
-            val messageData = hashMapOf(
-                "senderId" to message.senderId,
-                "senderName" to message.senderName,
-                "senderType" to message.senderType.name,
-                "message" to message.message,
-                "timestamp" to message.timestamp,
-                "isRead" to message.isRead,
-                "attachments" to message.attachments.map { attachment ->
-                    hashMapOf(
-                        "id" to attachment.id,
-                        "name" to attachment.name,
-                        "url" to attachment.url,
-                        "type" to attachment.type.name,
-                        "size" to attachment.size,
-                        "mimeType" to attachment.mimeType
-                    )
-                }
-            )
-            
-            db.collection("conversations")
-                .document(conversationId)
-                .collection("messages")
-                .document(message.id)
-                .set(messageData)
-                .await()
-            */
-            
-            Result.success(message)
-        } catch (e: Exception) {
-            Result.failure(e)
+fun getFileExtension(filename: String): String {
+    return filename.substringAfterLast('.', "")
+}
+
+/**
+ * Check if file is image
+ * I-check kung ang file ay image
+ */
+fun isImageFile(filename: String): Boolean {
+    val extension = getFileExtension(filename).lowercase()
+    return extension in listOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
+}
+
+/**
+ * Check if file is video
+ * I-check kung ang file ay video
+ */
+fun isVideoFile(filename: String): Boolean {
+    val extension = getFileExtension(filename).lowercase()
+    return extension in listOf("mp4", "avi", "mov", "wmv", "flv", "webm", "mkv")
+}
+
+/**
+ * Check if file is audio
+ * I-check kung ang file ay audio
+ */
+fun isAudioFile(filename: String): Boolean {
+    val extension = getFileExtension(filename).lowercase()
+    return extension in listOf("mp3", "wav", "aac", "ogg", "m4a", "flac")
+}
+
+/**
+ * Check if file is document
+ * I-check kung ang file ay document
+ */
+fun isDocumentFile(filename: String): Boolean {
+    val extension = getFileExtension(filename).lowercase()
+    return extension in listOf("pdf", "doc", "docx", "txt", "rtf", "odt")
+}
+
+/**
+ * Get attachment type from filename
+ * Kunin ang attachment type mula sa filename
+ */
+fun getAttachmentTypeFromFilename(filename: String): AttachmentType {
+    return when {
+        isImageFile(filename) -> AttachmentType.IMAGE
+        isVideoFile(filename) -> AttachmentType.VIDEO
+        isAudioFile(filename) -> AttachmentType.AUDIO
+        isDocumentFile(filename) -> AttachmentType.DOCUMENT
+        else -> AttachmentType.FILE
         }
     }
     
     /**
-     * Upload attachment to Firebase Storage
-     * Mag-upload ng attachment sa Firebase Storage
-     */
-    suspend fun uploadAttachment(
-        conversationId: String,
-        attachmentData: ByteArray,
-        fileName: String,
-        mimeType: String,
-        onProgress: (Float) -> Unit = {}
-    ): Result<MessageAttachment> {
-        return try {
-            // TODO: Implement Firebase Storage upload
-            /*
-            val storageRef = FirebaseStorage.getInstance().reference
-            val attachmentRef = storageRef.child("conversations/$conversationId/attachments/$fileName")
-            
-            val uploadTask = attachmentRef.putBytes(attachmentData)
-            
-            uploadTask.addOnProgressListener { taskSnapshot ->
-                val progress = (100.0 * taskSnapshot.bytesTransferred / taskSnapshot.totalByteCount).toFloat()
-                onProgress(progress / 100f)
-            }
-            
-            uploadTask.await()
-            val downloadUrl = attachmentRef.downloadUrl.await()
-            */
-            
-            // Simulate successful upload
-            val attachment = MessageAttachment(
-                id = "att_${System.currentTimeMillis()}",
-                name = fileName,
-                url = "https://example.com/$fileName",
-                type = when {
-                    mimeType.startsWith("image/") -> AttachmentType.IMAGE
-                    mimeType.startsWith("video/") -> AttachmentType.VIDEO
-                    mimeType.startsWith("audio/") -> AttachmentType.AUDIO
-                    else -> AttachmentType.FILE
-                },
-                size = attachmentData.size.toLong(),
-                mimeType = mimeType
-            )
-            
-            Result.success(attachment)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-    
-    /**
-     * Load messages from Firestore
-     * Mag-load ng messages mula sa Firestore
-     */
-    suspend fun loadMessages(
-        conversationId: String,
-        limit: Int = 50,
-        lastMessageId: String? = null
-    ): Result<List<ChatMessage>> {
-        return try {
-            // TODO: Implement Firestore message loading
-            /*
-            val db = FirebaseFirestore.getInstance()
-            var query = db.collection("conversations")
-                .document(conversationId)
-                .collection("messages")
-                .orderBy("timestamp", Query.Direction.ASCENDING)
-                .limit(limit.toLong())
-            
-            if (lastMessageId != null) {
-                val lastDoc = db.collection("conversations")
-                    .document(conversationId)
-                    .collection("messages")
-                    .document(lastMessageId)
-                    .get()
-                    .await()
-                query = query.startAfter(lastDoc)
-            }
-            
-            val snapshot = query.get().await()
-            val messages = snapshot.documents.mapNotNull { doc ->
-                // Convert Firestore document to ChatMessage
-                // ...
-            }
-            */
-            
-            // Return sample data for now
-            Result.success(getSampleMessages(conversationId))
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-    
-    /**
-     * Mark messages as read
-     * I-mark ang mga messages bilang nabasa
-     */
-    suspend fun markMessagesAsRead(
-        conversationId: String,
-        messageIds: List<String>
-    ): Result<Unit> {
-        return try {
-            // TODO: Implement Firestore read status update
-            /*
-            val db = FirebaseFirestore.getInstance()
-            val batch = db.batch()
-            
-            messageIds.forEach { messageId ->
-                val messageRef = db.collection("conversations")
-                    .document(conversationId)
-                    .collection("messages")
-                    .document(messageId)
-                batch.update(messageRef, "isRead", true)
-            }
-            
-            batch.commit().await()
-            */
-            
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+ * Format file size to human readable string
+ * I-format ang file size sa human readable string
+ */
+fun formatFileSize(sizeBytes: Long): String {
+    return when {
+        sizeBytes < 1024 -> "$sizeBytes B"
+        sizeBytes < 1024 * 1024 -> "${sizeBytes / 1024} KB"
+        sizeBytes < 1024 * 1024 * 1024 -> "${sizeBytes / (1024 * 1024)} MB"
+        else -> "${sizeBytes / (1024 * 1024 * 1024)} GB"
     }
 }
 
 /**
- * Utility functions for message formatting
- * Mga utility function para sa message formatting
+ * Validate message content
+ * I-validate ang message content
  */
+fun validateMessageContent(content: String): Boolean {
+    return content.trim().isNotEmpty() && content.length <= 5000
+}
 
 /**
- * Format timestamp to readable format
- * I-format ang timestamp sa readable format
+ * Format timestamp for message display
+ * I-format ang timestamp para sa message display
  */
-fun formatMessageTime(timestamp: Date): String {
-    val now = Date()
-    val diff = now.time - timestamp.time
+fun formatMessageTime(timestamp: java.util.Date): String {
+    val now = System.currentTimeMillis()
+    val messageTime = timestamp.time
+    val diff = now - messageTime
     
     return when {
-        diff < 60 * 1000 -> "Just now"
-        diff < 60 * 60 * 1000 -> "${diff / (60 * 1000)}m ago"
-        diff < 24 * 60 * 60 * 1000 -> "${diff / (60 * 60 * 1000)}h ago"
-        diff < 7 * 24 * 60 * 60 * 1000 -> "${diff / (24 * 60 * 60 * 1000)}d ago"
-        else -> java.text.SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(timestamp)
+        diff < 60_000 -> "Just now" // Less than 1 minute
+        diff < 3600_000 -> "${diff / 60_000}m ago" // Less than 1 hour
+        diff < 86400_000 -> "${diff / 3600_000}h ago" // Less than 1 day
+        diff < 604800_000 -> "${diff / 86400_000}d ago" // Less than 1 week
+        else -> {
+            val date = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+            date.format(timestamp)
+        }
     }
 }
 
 /**
- * Format file size to human readable format
- * I-format ang file size sa human readable format
+ * Get MIME type from file extension
+ * Kunin ang MIME type mula sa file extension
  */
-fun formatFileSize(sizeInBytes: Long): String {
-    if (sizeInBytes < 1024) return "${sizeInBytes}B"
-    if (sizeInBytes < 1024 * 1024) return "${"%.1f".format(sizeInBytes / 1024.0)}KB"
-    if (sizeInBytes < 1024 * 1024 * 1024) return "${"%.1f".format(sizeInBytes / (1024.0 * 1024.0))}MB"
-    return "${"%.1f".format(sizeInBytes / (1024.0 * 1024.0 * 1024.0))}GB"
-}
-
-/**
- * Get file type icon based on mime type
- * Kumuha ng file type icon base sa mime type
- */
-fun getFileTypeIcon(mimeType: String): androidx.compose.ui.graphics.vector.ImageVector {
-    return when {
-        mimeType.startsWith("image/") -> Icons.Filled.Image
-        mimeType.startsWith("video/") -> Icons.Filled.VideoLibrary
-        mimeType.startsWith("audio/") -> Icons.Filled.AudioFile
-        mimeType == "application/pdf" -> Icons.Filled.PictureAsPdf
-        mimeType.contains("document") || mimeType.contains("word") -> Icons.Filled.Description
-        mimeType.contains("spreadsheet") || mimeType.contains("excel") -> Icons.Filled.Assessment
-        else -> Icons.Filled.AttachFile
+fun getMimeTypeFromExtension(filename: String): String {
+    return when (getFileExtension(filename).lowercase()) {
+        "jpg", "jpeg" -> "image/jpeg"
+        "png" -> "image/png"
+        "gif" -> "image/gif"
+        "webp" -> "image/webp"
+        "bmp" -> "image/bmp"
+        "mp4" -> "video/mp4"
+        "avi" -> "video/avi"
+        "mov" -> "video/quicktime"
+        "wmv" -> "video/x-ms-wmv"
+        "flv" -> "video/x-flv"
+        "webm" -> "video/webm"
+        "mkv" -> "video/x-matroska"
+        "mp3" -> "audio/mpeg"
+        "wav" -> "audio/wav"
+        "aac" -> "audio/aac"
+        "ogg" -> "audio/ogg"
+        "m4a" -> "audio/mp4"
+        "flac" -> "audio/flac"
+        "pdf" -> "application/pdf"
+        "doc" -> "application/msword"
+        "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "txt" -> "text/plain"
+        "rtf" -> "application/rtf"
+        "odt" -> "application/vnd.oasis.opendocument.text"
+        "zip" -> "application/zip"
+        "rar" -> "application/x-rar-compressed"
+        "7z" -> "application/x-7z-compressed"
+        else -> "application/octet-stream"
     }
 }

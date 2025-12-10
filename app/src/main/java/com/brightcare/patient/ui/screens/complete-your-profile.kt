@@ -31,9 +31,13 @@ import com.brightcare.patient.ui.rememberToastState
 import com.brightcare.patient.ui.showInfo
 import com.brightcare.patient.ui.showError
 import androidx.compose.ui.text.font.FontStyle
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 
 data class CompleteProfileFormState(
     val firstName: String = "",
+    val middleName: String = "",
     val lastName: String = "",
     val suffix: String = "",
     val birthDate: String = "",
@@ -45,12 +49,22 @@ data class CompleteProfileFormState(
     val barangay: String = "",
     val additionalAddress: String = "",
     
+    // Profile Picture
+    val profilePictureUrl: String = "",
+    
+    // ID Upload fields
+    val idFrontImageUri: String = "",
+    val idBackImageUri: String = "",
+    val idFrontImageUrl: String = "", // Firebase Storage URL after upload
+    val idBackImageUrl: String = "", // Firebase Storage URL after upload
+    
     // Terms and Privacy Policy (moved from signup)
     val agreedToTerms: Boolean = false,
     val agreedToPrivacy: Boolean = false,
     
     // Error states
     val isFirstNameError: Boolean = false,
+    val isMiddleNameError: Boolean = false,
     val isLastNameError: Boolean = false,
     val isBirthDateError: Boolean = false,
     val isSexError: Boolean = false,
@@ -59,16 +73,21 @@ data class CompleteProfileFormState(
     val isMunicipalityError: Boolean = false,
     val isAdditionalAddressError: Boolean = false,
     val isTermsError: Boolean = false,
+    val isIdFrontError: Boolean = false,
+    val isIdBackError: Boolean = false,
     
     // Error messages
     val firstNameErrorMessage: String = "",
+    val middleNameErrorMessage: String = "",
     val lastNameErrorMessage: String = "",
     val birthDateErrorMessage: String = "",
     val sexErrorMessage: String = "",
     val phoneNumberErrorMessage: String = "",
     val provinceErrorMessage: String = "",
     val municipalityErrorMessage: String = "",
-    val additionalAddressErrorMessage: String = ""
+    val additionalAddressErrorMessage: String = "",
+    val idFrontErrorMessage: String = "",
+    val idBackErrorMessage: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +105,9 @@ fun CompleteYourProfileScreen(
     val context = LocalContext.current
     val toastState = rememberToastState()
     
+    // State for sign out confirmation dialog
+    var showSignOutDialog by remember { mutableStateOf(false) }
+    
     val addressData = rememberAddressDataOnce()
     if (addressData == null || uiState.isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -94,7 +116,7 @@ fun CompleteYourProfileScreen(
         return
     }
     
-    // Real-time validation: check if all required fields are valid including terms/privacy
+    // Real-time validation: check if all required fields are valid including terms/privacy and ID uploads
     val isFormValid by remember(uiState.formState) {
         derivedStateOf {
             uiState.formState.firstName.isNotBlank() &&
@@ -104,9 +126,12 @@ fun CompleteYourProfileScreen(
             uiState.formState.phoneNumber.isNotBlank() &&
             uiState.formState.province.isNotBlank() &&
             uiState.formState.municipality.isNotBlank() &&
+            uiState.formState.idFrontImageUri.isNotBlank() &&
+            uiState.formState.idBackImageUri.isNotBlank() &&
             uiState.formState.agreedToTerms &&
             uiState.formState.agreedToPrivacy &&
             !uiState.formState.isFirstNameError &&
+            !uiState.formState.isMiddleNameError &&
             !uiState.formState.isLastNameError &&
             !uiState.formState.isBirthDateError &&
             !uiState.formState.isSexError &&
@@ -114,6 +139,8 @@ fun CompleteYourProfileScreen(
             !uiState.formState.isProvinceError &&
             !uiState.formState.isMunicipalityError &&
             !uiState.formState.isAdditionalAddressError &&
+            !uiState.formState.isIdFrontError &&
+            !uiState.formState.isIdBackError &&
             !uiState.formState.isTermsError
         }
     }
@@ -132,10 +159,21 @@ fun CompleteYourProfileScreen(
         }
     }
     
-    // Show error toast
+    // Show error toast and handle authentication errors
     uiState.errorMessage?.let { errorMessage ->
         LaunchedEffect(errorMessage) {
             toastState.showError(errorMessage)
+            
+            // If it's an authentication error, log it for debugging
+            if (errorMessage.contains("must be logged in", ignoreCase = true) ||
+                errorMessage.contains("authentication", ignoreCase = true) ||
+                errorMessage.contains("session expired", ignoreCase = true)) {
+                
+                // Log authentication error for debugging
+                android.util.Log.w("CompleteProfileScreen", "Authentication error detected: $errorMessage")
+                // User will need to manually retry or re-authenticate
+            }
+            
             viewModel.clearError()
         }
     }
@@ -159,6 +197,11 @@ fun CompleteYourProfileScreen(
         }
     }
     
+    // Handle system back button
+    BackHandler {
+        showSignOutDialog = true
+    }
+    
     // Date picker is now handled internally by BirthDateTextField
     
     Column(
@@ -178,11 +221,7 @@ fun CompleteYourProfileScreen(
         ) {
             TermsBackButton(
                 onClick = {
-                    // Clear session and go back to login
-                    signInViewModel.signOut()
-                    navController.navigate("login?clearStates=true") {
-                        popUpTo(0) { inclusive = true }
-                    }
+                    showSignOutDialog = true
                 }
             )
         }
@@ -221,6 +260,7 @@ fun CompleteYourProfileScreen(
         CompleteProfileForm(
             formState = uiState.formState,
             onFormStateChange = { updater -> viewModel.updateFormState(updater) },
+            onPhoneNumberValidation = { phoneNumber -> viewModel.validatePhoneNumber(phoneNumber) },
             modifier = Modifier.fillMaxWidth()
         )
         
@@ -270,11 +310,17 @@ fun CompleteYourProfileScreen(
             text = "Save & Continue",
             onClick = {
                 if (!isFormValid) {
-                    // Show terms error if not agreed
-                    if (!uiState.formState.agreedToTerms || !uiState.formState.agreedToPrivacy) {
-                        viewModel.updateFormState { currentState ->
-                            currentState.copy(isTermsError = true)
-                        }
+                    // Show validation errors for missing required fields
+                    viewModel.updateFormState { currentState ->
+                        currentState.copy(
+                            isTermsError = !currentState.agreedToTerms || !currentState.agreedToPrivacy,
+                            isIdFrontError = currentState.idFrontImageUri.isBlank(),
+                            isIdBackError = currentState.idBackImageUri.isBlank(),
+                            idFrontErrorMessage = if (currentState.idFrontImageUri.isBlank()) 
+                                "Front ID image is required" else "",
+                            idBackErrorMessage = if (currentState.idBackImageUri.isBlank()) 
+                                "Back ID image is required" else ""
+                        )
                     }
                     return@CompleteProfileButton
                 }
@@ -297,6 +343,63 @@ fun CompleteYourProfileScreen(
         BrightCareToast(
             toastState = toastState,
             modifier = Modifier.padding(16.dp)
+        )
+    }
+    
+    // Sign out confirmation dialog
+    if (showSignOutDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignOutDialog = false },
+            title = {
+                Text(
+                    text = "Incomplete Profile",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        color = Blue500
+                    )
+                )
+            },
+            text = {
+                Text(
+                    text = "Your profile is not yet complete. Are you sure you want to sign out?",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = Gray700
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSignOutDialog = false
+                        // Clear session and go back to login
+                        signInViewModel.signOut()
+                        navController.navigate("login?clearStates=true") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(
+                        text = "Sign Out",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showSignOutDialog = false },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Blue500
+                    )
+                ) {
+                    Text(
+                        text = "Continue Profile",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            },
+            tonalElevation = 8.dp
         )
     }
 }

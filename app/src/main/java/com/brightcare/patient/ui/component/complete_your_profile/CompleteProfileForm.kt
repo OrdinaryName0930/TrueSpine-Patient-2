@@ -24,6 +24,7 @@ fun String.toDisplayName(): String =
 fun CompleteProfileForm(
     formState: CompleteProfileFormState,
     onFormStateChange: ((CompleteProfileFormState) -> CompleteProfileFormState) -> Unit,
+    onPhoneNumberValidation: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
@@ -201,18 +202,15 @@ fun CompleteProfileForm(
                 // Limit to 11 digits
                 if (cleanValue.length > 11) cleanValue = cleanValue.take(11)
 
-                val isValid = ValidationUtils.isValidPhoneNumber(cleanValue)
-
+                // Update the form state first
                 onFormStateChange { old ->
-                    old.copy(
-                        phoneNumber = cleanValue,
-                        isPhoneNumberError = cleanValue.isNotBlank() && !isValid,
-                        phoneNumberErrorMessage = if (cleanValue.isNotBlank() && !isValid)
-                            "Phone number must start with 09 and have 11 digits" else ""
-                    )
+                    old.copy(phoneNumber = cleanValue)
                 }
+                
+                // Then trigger validation (including duplicate check)
+                onPhoneNumberValidation?.invoke(cleanValue)
             },
-            placeholder = "*Phone Number",
+            placeholder = "*Phone Number (09XXXXXXXXX)",
             isError = formState.isPhoneNumberError,
             errorMessage = formState.phoneNumberErrorMessage,
             keyboardType = KeyboardType.Phone,
@@ -310,7 +308,7 @@ fun CompleteProfileForm(
                         additionalAddress = cleanValue,
                         isAdditionalAddressError = cleanValue.trim().isNotBlank() && !isValid,
                         additionalAddressErrorMessage = if (cleanValue.trim().isNotBlank() && !isValid)
-                            "Additional address must be at least 3 characters long and may only contain letters (including ñ), numbers, spaces, and basic punctuation (,.#'-/)." else ""
+                            "Additional address must be at least 3 characters long and may only contain letters, numbers, spaces, and basic punctuation (,.#'-/)." else ""
                     )
                 }
             },
@@ -322,6 +320,34 @@ fun CompleteProfileForm(
             onImeAction = { focusManager.clearFocus() }
         )
 
+        // ID Upload Section
+        IdUploadComponent(
+            frontImageUri = formState.idFrontImageUri,
+            backImageUri = formState.idBackImageUri,
+            onFrontImageSelected = { uri ->
+                onFormStateChange { old ->
+                    old.copy(
+                        idFrontImageUri = uri,
+                        isIdFrontError = false,
+                        idFrontErrorMessage = ""
+                    )
+                }
+            },
+            onBackImageSelected = { uri ->
+                onFormStateChange { old ->
+                    old.copy(
+                        idBackImageUri = uri,
+                        isIdBackError = false,
+                        idBackErrorMessage = ""
+                    )
+                }
+            },
+            isFrontError = formState.isIdFrontError,
+            isBackError = formState.isIdBackError,
+            frontErrorMessage = formState.idFrontErrorMessage,
+            backErrorMessage = formState.idBackErrorMessage,
+            modifier = Modifier.padding(top = 16.dp)
+        )
 
     }
 }

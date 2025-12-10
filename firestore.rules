@@ -1,67 +1,118 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read access to chiropractors collection for all authenticated users
-    // Magbigay ng read access sa chiropractors collection para sa lahat ng authenticated users
-    match /chiropractors/{chiropractorId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == resource.data.userId;
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
     }
     
-    // Allow users to read and write their own user data
-    // Payagan ang mga users na magbasa at magsulat ng kanilang sariling user data
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isParticipant(participantIds) {
+      return request.auth.uid in participantIds;
+    }
+    
+    // Users collection - users can only access their own document
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAuthenticated() && isOwner(userId);
     }
     
-    // Allow authenticated users to read and write their own profile data
-    // Payagan ang mga authenticated users na magbasa at magsulat ng kanilang profile data
-    match /userProfiles/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // Patients collection - patients can only access their own document
+    match /patients/{patientId} {
+      allow read, write: if isAuthenticated() && isOwner(patientId);
     }
     
-    // Allow authenticated users to read and write their own client profile data
-    // Payagan ang mga authenticated users na magbasa at magsulat ng kanilang client profile data
-    match /client/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // Chiropractors collection - read-only for patients, full access for chiropractors
+    match /chiropractors/{chiropractorId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isOwner(chiropractorId);
     }
     
-    // Allow authenticated users to read and write conversations they participate in
-    // Payagan ang mga authenticated users na magbasa at magsulat ng conversations na kasali sila
+    // Conversations collection
     match /conversations/{conversationId} {
-      allow read, write: if request.auth != null && 
-        (request.auth.uid in resource.data.participants || 
-         request.auth.uid in request.resource.data.participants);
+      // Allow read/write only for conversation participants
+      allow read, write: if isAuthenticated() && 
+        isParticipant(resource.data.participantIds);
+      
+      // Allow creation if user is one of the participants
+      allow create: if isAuthenticated() && 
+        isParticipant(request.resource.data.participantIds);
+      
+      // Messages subcollection
+      match /messages/{messageId} {
+        // Allow read for conversation participants
+        allow read: if isAuthenticated() && 
+          isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds);
+        
+        // Allow write for message sender or receiver
+        allow write: if isAuthenticated() && 
+          (isOwner(resource.data.senderId) || isOwner(resource.data.receiverId)) &&
+          isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds);
+        
+        // Allow creation if user is sender and part of conversation
+        allow create: if isAuthenticated() && 
+          isOwner(request.resource.data.senderId) &&
+          isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds);
+        
+        // Allow update for message status (read, delivered, etc.)
+        allow update: if isAuthenticated() && 
+          (isOwner(resource.data.senderId) || isOwner(resource.data.receiverId)) &&
+          isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds);
+        
+        // Allow delete only for message sender
+        allow delete: if isAuthenticated() && 
+          isOwner(resource.data.senderId);
+      }
     }
     
-    // Allow authenticated users to read and write messages in conversations they participate in
-    // Payagan ang mga authenticated users na magbasa at magsulat ng messages sa conversations na kasali sila
-    match /conversations/{conversationId}/messages/{messageId} {
-      allow read, write: if request.auth != null && 
-        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-    }
-    
-    // Allow authenticated users to read and write their own appointments
-    // Payagan ang mga authenticated users na magbasa at magsulat ng kanilang appointments
-    match /appointments/{appointmentId} {
-      allow read, write: if request.auth != null && 
-        (request.auth.uid == resource.data.patientId || 
-         request.auth.uid == resource.data.chiropractorId);
-    }
-    
-    // Allow authenticated users to read and write their own bookings
-    // Payagan ang mga authenticated users na magbasa at magsulat ng kanilang bookings
-    match /bookings/{bookingId} {
-      allow read, write: if request.auth != null && 
-        (request.auth.uid == resource.data.patientId || 
-         request.auth.uid == resource.data.chiropractorId);
-    }
-    
-    // Default rule: deny all other access
-    // Default rule: tanggihan ang lahat ng ibang access
+    // Deny all other access
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+
+// Firebase Storage Security Rules
+// Add this to your Firebase Storage rules
+/*
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isParticipantInConversation(conversationId) {
+      // This would need to be implemented with a Firestore lookup
+      // For now, we'll allow access if user is authenticated
+      return request.auth != null;
+    }
+    
+    // Conversation files - only participants can upload/download
+    match /conversations/{conversationId}/{allPaths=**} {
+      allow read, write: if isAuthenticated() && 
+        isParticipantInConversation(conversationId);
+    }
+    
+    // User profile images - only owner can upload/update
+    match /users/{userId}/profile/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+*/

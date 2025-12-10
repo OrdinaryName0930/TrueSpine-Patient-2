@@ -1,10 +1,12 @@
 package com.brightcare.patient.data.repository
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.storage.FirebaseStorage
 import com.brightcare.patient.ui.screens.CompleteProfileFormState
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -18,14 +20,49 @@ import javax.inject.Singleton
 class CompleteProfileRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
+    private val firebaseStorage: FirebaseStorage,
     private val context: Context
 ) {
     
     companion object {
         private const val TAG = "CompleteProfileRepository"
         private const val COLLECTION_CLIENTS = "client"
+        private const val SUBCOLLECTION_PERSONAL_DATA = "personal_data"
+        private const val DOCUMENT_INFO = "info"
+        private const val STORAGE_PATH_ID_IMAGES = "client_id_images"
     }
     
+    /**
+     * Upload ID image to Firebase Storage
+     * I-upload ang ID image sa Firebase Storage
+     */
+    private suspend fun uploadIdImage(imageUri: String, userId: String, imageType: String): Result<String> {
+        return try {
+            if (imageUri.isBlank()) {
+                return Result.failure(Exception("Image URI is empty"))
+            }
+            
+            val uri = Uri.parse(imageUri)
+            val fileName = "${userId}_${imageType}_${System.currentTimeMillis()}.jpg"
+            val storageRef = firebaseStorage.reference
+                .child(STORAGE_PATH_ID_IMAGES)
+                .child(userId)
+                .child(fileName)
+            
+            Log.d(TAG, "Uploading $imageType image for user: $userId")
+            
+            val uploadTask = storageRef.putFile(uri).await()
+            val downloadUrl = uploadTask.storage.downloadUrl.await()
+            
+            Log.d(TAG, "$imageType image uploaded successfully. URL: $downloadUrl")
+            Result.success(downloadUrl.toString())
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error uploading $imageType image", e)
+            Result.failure(Exception("Failed to upload $imageType image: ${e.message}"))
+        }
+    }
+
     /**
      * Save complete profile data to Firestore
      * Stores the information in "client" collection with user's UID as document ID
@@ -41,7 +78,27 @@ class CompleteProfileRepository @Inject constructor(
             
             Log.d(TAG, "Saving profile for authenticated user: ${currentUser.uid}")
             
-            // Prepare the profile data including terms and privacy policy
+            // Upload ID images if provided
+            var idFrontUrl = formState.idFrontImageUrl
+            var idBackUrl = formState.idBackImageUrl
+            
+            if (formState.idFrontImageUri.isNotBlank() && formState.idFrontImageUri != formState.idFrontImageUrl) {
+                val frontUploadResult = uploadIdImage(formState.idFrontImageUri, currentUser.uid, "front")
+                if (frontUploadResult.isFailure) {
+                    return frontUploadResult.map { }
+                }
+                idFrontUrl = frontUploadResult.getOrNull() ?: ""
+            }
+            
+            if (formState.idBackImageUri.isNotBlank() && formState.idBackImageUri != formState.idBackImageUrl) {
+                val backUploadResult = uploadIdImage(formState.idBackImageUri, currentUser.uid, "back")
+                if (backUploadResult.isFailure) {
+                    return backUploadResult.map { }
+                }
+                idBackUrl = backUploadResult.getOrNull() ?: ""
+            }
+            
+            // Prepare the profile data including terms and privacy policy and ID images
             val profileData = hashMapOf(
                 "firstName" to formState.firstName.trim(),
                 "lastName" to formState.lastName.trim(),
@@ -54,6 +111,8 @@ class CompleteProfileRepository @Inject constructor(
                 "municipality" to formState.municipality,
                 "barangay" to formState.barangay,
                 "additionalAddress" to formState.additionalAddress.trim(),
+                "idFrontImageUrl" to idFrontUrl,
+                "idBackImageUrl" to idBackUrl,
                 "agreedToTerms" to formState.agreedToTerms,
                 "agreedToPrivacy" to formState.agreedToPrivacy,
                 "profileCompleted" to true,
@@ -61,9 +120,11 @@ class CompleteProfileRepository @Inject constructor(
                 "updatedAt" to System.currentTimeMillis()
             )
             
-            // Update existing document with profile data (merge to preserve existing fields)
+            // Save profile data in nested structure: client/{clientId}/personal_data/info
             firestore.collection(COLLECTION_CLIENTS)
                 .document(currentUser.uid)
+                .collection(SUBCOLLECTION_PERSONAL_DATA)
+                .document(DOCUMENT_INFO)
                 .set(profileData, com.google.firebase.firestore.SetOptions.merge())
                 .await()
             
@@ -103,8 +164,11 @@ class CompleteProfileRepository @Inject constructor(
             
             Log.d(TAG, "Checking profile completion for user: ${currentUser.uid}")
             
+            // Check profile completion in nested structure: client/{clientId}/personal_data/info
             val document = firestore.collection(COLLECTION_CLIENTS)
                 .document(currentUser.uid)
+                .collection(SUBCOLLECTION_PERSONAL_DATA)
+                .document(DOCUMENT_INFO)
                 .get()
                 .await()
             
@@ -139,16 +203,28 @@ class CompleteProfileRepository @Inject constructor(
      */
     suspend fun getProfileData(): Result<CompleteProfileFormState?> {
         return try {
-            val currentUser = firebaseAuth.currentUser
+            // Wait for Firebase Auth to initialize if needed
+            var currentUser = firebaseAuth.currentUser
+            if (currentUser == null) {
+                Log.w(TAG, "No authenticated user found initially, waiting for auth state...")
+                // Give Firebase Auth a moment to initialize
+                kotlinx.coroutines.delay(1000)
+                currentUser = firebaseAuth.currentUser
+            }
+            
             if (currentUser == null) {
                 Log.e(TAG, "No authenticated user found when getting profile data")
                 return Result.failure(Exception("User must be logged in to view profile data"))
             }
             
-            Log.d(TAG, "Fetching profile data for user: ${currentUser.uid}")
+            Log.d(TAG, "Fetching profile data for authenticated user: ${currentUser.uid}")
+            Log.d(TAG, "User email: ${currentUser.email}, isEmailVerified: ${currentUser.isEmailVerified}")
             
+            // Get profile data from nested structure: client/{clientId}/personal_data/info
             val document = firestore.collection(COLLECTION_CLIENTS)
                 .document(currentUser.uid)
+                .collection(SUBCOLLECTION_PERSONAL_DATA)
+                .document(DOCUMENT_INFO)
                 .get()
                 .await()
             
@@ -170,6 +246,11 @@ class CompleteProfileRepository @Inject constructor(
                 municipality = document.getString("municipality") ?: "",
                 barangay = document.getString("barangay") ?: "",
                 additionalAddress = document.getString("additionalAddress") ?: "",
+                profilePictureUrl = document.getString("profilePictureUrl") ?: "",
+                idFrontImageUrl = document.getString("idFrontImageUrl") ?: "",
+                idBackImageUrl = document.getString("idBackImageUrl") ?: "",
+                idFrontImageUri = document.getString("idFrontImageUrl") ?: "", // Set URI to URL for display
+                idBackImageUri = document.getString("idBackImageUrl") ?: "", // Set URI to URL for display
                 agreedToTerms = document.getBoolean("agreedToTerms") ?: false,
                 agreedToPrivacy = document.getBoolean("agreedToPrivacy") ?: false
             )
@@ -197,6 +278,57 @@ class CompleteProfileRepository @Inject constructor(
     }
     
     /**
+     * Upload profile picture to Firebase Storage
+     * I-upload ang profile picture sa Firebase Storage
+     */
+    suspend fun uploadProfilePicture(imageUri: String): Result<String> {
+        return try {
+            val currentUser = firebaseAuth.currentUser
+            if (currentUser == null) {
+                Log.e(TAG, "No authenticated user found when uploading profile picture")
+                return Result.failure(Exception("User must be logged in to upload profile picture"))
+            }
+            
+            if (imageUri.isBlank()) {
+                return Result.failure(Exception("Image URI is empty"))
+            }
+            
+            val uri = Uri.parse(imageUri)
+            val fileName = "profile_${currentUser.uid}_${System.currentTimeMillis()}.jpg"
+            val storageRef = firebaseStorage.reference
+                .child("profile_pictures")
+                .child(currentUser.uid)
+                .child(fileName)
+            
+            Log.d(TAG, "Uploading profile picture for user: ${currentUser.uid}")
+            
+            val uploadTask = storageRef.putFile(uri).await()
+            val downloadUrl = uploadTask.storage.downloadUrl.await()
+            
+            Log.d(TAG, "Profile picture uploaded successfully. URL: $downloadUrl")
+            
+            // Update user profile with new picture URL
+            val updateData = hashMapOf<String, Any>(
+                "profilePictureUrl" to downloadUrl.toString(),
+                "updatedAt" to System.currentTimeMillis()
+            )
+            
+            firestore.collection(COLLECTION_CLIENTS)
+                .document(currentUser.uid)
+                .collection(SUBCOLLECTION_PERSONAL_DATA)
+                .document(DOCUMENT_INFO)
+                .update(updateData)
+                .await()
+            
+            Result.success(downloadUrl.toString())
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error uploading profile picture", e)
+            Result.failure(Exception("Failed to upload profile picture: ${e.message}"))
+        }
+    }
+    
+    /**
      * Update existing profile data
      */
     suspend fun updateProfile(formState: CompleteProfileFormState): Result<Unit> {
@@ -209,7 +341,27 @@ class CompleteProfileRepository @Inject constructor(
             
             Log.d(TAG, "Updating profile for user: ${currentUser.uid}")
             
-            // Prepare the update data including terms and privacy policy
+            // Upload ID images if provided and different from existing URLs
+            var idFrontUrl = formState.idFrontImageUrl
+            var idBackUrl = formState.idBackImageUrl
+            
+            if (formState.idFrontImageUri.isNotBlank() && formState.idFrontImageUri != formState.idFrontImageUrl) {
+                val frontUploadResult = uploadIdImage(formState.idFrontImageUri, currentUser.uid, "front")
+                if (frontUploadResult.isFailure) {
+                    return frontUploadResult.map { }
+                }
+                idFrontUrl = frontUploadResult.getOrNull() ?: ""
+            }
+            
+            if (formState.idBackImageUri.isNotBlank() && formState.idBackImageUri != formState.idBackImageUrl) {
+                val backUploadResult = uploadIdImage(formState.idBackImageUri, currentUser.uid, "back")
+                if (backUploadResult.isFailure) {
+                    return backUploadResult.map { }
+                }
+                idBackUrl = backUploadResult.getOrNull() ?: ""
+            }
+            
+            // Prepare the update data including terms and privacy policy and ID images
             val updateData = hashMapOf(
                 "firstName" to formState.firstName.trim(),
                 "lastName" to formState.lastName.trim(),
@@ -222,14 +374,19 @@ class CompleteProfileRepository @Inject constructor(
                 "municipality" to formState.municipality,
                 "barangay" to formState.barangay,
                 "additionalAddress" to formState.additionalAddress.trim(),
+                "idFrontImageUrl" to idFrontUrl,
+                "idBackImageUrl" to idBackUrl,
                 "agreedToTerms" to formState.agreedToTerms,
                 "agreedToPrivacy" to formState.agreedToPrivacy,
-                "profileCompleted" to true
+                "profileCompleted" to true,
+                "updatedAt" to System.currentTimeMillis()
             )
             
-            // Update the document
+            // Update the document in nested structure: client/{clientId}/personal_data/info
             firestore.collection(COLLECTION_CLIENTS)
                 .document(currentUser.uid)
+                .collection(SUBCOLLECTION_PERSONAL_DATA)
+                .document(DOCUMENT_INFO)
                 .update(updateData as Map<String, Any>)
                 .await()
             
@@ -238,6 +395,66 @@ class CompleteProfileRepository @Inject constructor(
             
         } catch (e: Exception) {
             Log.e(TAG, "Error updating profile", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Check if phone number already exists in another account
+     * Tingnan kung may ibang account na na may ganitong phone number
+     */
+    suspend fun isPhoneNumberTaken(phoneNumber: String): Result<Boolean> {
+        return try {
+            val currentUser = firebaseAuth.currentUser
+            if (currentUser == null) {
+                Log.e(TAG, "No authenticated user found when checking phone number")
+                return Result.failure(Exception("User must be logged in to check phone number"))
+            }
+            
+            if (phoneNumber.isBlank()) {
+                return Result.success(false)
+            }
+            
+            Log.d(TAG, "Checking if phone number $phoneNumber is already taken...")
+            
+            // Query all client documents to find if phone number exists
+            val querySnapshot = firestore.collectionGroup(SUBCOLLECTION_PERSONAL_DATA)
+                .whereEqualTo("phoneNumber", phoneNumber)
+                .get()
+                .await()
+            
+            // Check if any document exists with this phone number from a different user
+            val isPhoneTaken = querySnapshot.documents.any { document ->
+                // Get the client ID from the document path
+                val clientId = document.reference.parent.parent?.id
+                // Phone number is taken if it belongs to a different user
+                clientId != null && clientId != currentUser.uid
+            }
+            
+            Log.d(TAG, "Found ${querySnapshot.documents.size} documents with phone number $phoneNumber")
+            querySnapshot.documents.forEach { doc ->
+                val clientId = doc.reference.parent.parent?.id
+                Log.d(TAG, "Document client ID: $clientId, Current user: ${currentUser.uid}")
+            }
+            
+            Log.d(TAG, "Phone number $phoneNumber taken status: $isPhoneTaken")
+            Result.success(isPhoneTaken)
+            
+        } catch (e: FirebaseFirestoreException) {
+            Log.e(TAG, "Firestore error checking phone number: ${e.code} - ${e.message}", e)
+            when (e.code) {
+                FirebaseFirestoreException.Code.PERMISSION_DENIED -> {
+                    Result.failure(Exception("Access denied. Please make sure you are logged in and have permission to check phone numbers."))
+                }
+                FirebaseFirestoreException.Code.UNAUTHENTICATED -> {
+                    Result.failure(Exception("Authentication required. Please log in to check phone number."))
+                }
+                else -> {
+                    Result.failure(Exception("Failed to check phone number: ${e.message}"))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking phone number", e)
             Result.failure(e)
         }
     }

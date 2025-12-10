@@ -15,9 +15,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.brightcare.patient.navigation.NavigationRoutes
 import com.brightcare.patient.ui.component.chirocomponents.ChiropractorInfo
 import com.brightcare.patient.ui.component.chirocomponents.ChiropractorCard
 import com.brightcare.patient.ui.component.chirocomponents.ChiroHeader
+import com.brightcare.patient.ui.component.messagecomponent.SimpleMessageSearch
 import com.brightcare.patient.ui.viewmodel.ChiropractorViewModel
 import com.brightcare.patient.ui.theme.*
 
@@ -37,6 +39,7 @@ fun ChiroScreen(
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val showAvailableOnly by viewModel.showAvailableOnly.collectAsStateWithLifecycle()
     val showNearMeOnly by viewModel.showNearMeOnly.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -57,6 +60,14 @@ fun ChiroScreen(
                 // For now, just refresh the data
                 viewModel.refresh()
             }
+        )
+        
+        // Search bar
+        SimpleMessageSearch(
+            searchQuery = searchQuery,
+            onSearchQueryChange = viewModel::updateSearchQuery,
+            placeholder = "Search chiropractors...",
+            modifier = Modifier.padding(bottom = 16.dp)
         )
 
         // Content based on loading state
@@ -129,14 +140,14 @@ fun ChiroScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "No chiropractors found",
+                            text = if (searchQuery.isNotEmpty()) "No chiropractors found" else "No chiropractors available",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 color = Gray600,
                                 fontWeight = FontWeight.Bold
                             )
                         )
                         Text(
-                            text = "Please try again later or adjust your filters",
+                            text = if (searchQuery.isNotEmpty()) "Try adjusting your search terms" else "Please try again later or adjust your filters",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = Gray500
                             )
@@ -154,12 +165,12 @@ fun ChiroScreen(
                         ChiropractorCard(
                             chiropractor = chiropractor,
                             onBookClick = {
-                                // Navigate to booking screen with chiropractor info
-                                navController.navigate("booking/${chiropractor.id}")
+                                // Navigate to book appointment activity
+                                navController.navigate("book_appointment/${chiropractor.id}")
                             },
                             onViewProfileClick = {
                                 // Navigate to chiropractor profile
-                                navController.navigate("chiro_profile/${chiropractor.id}")
+                                navController.navigate(NavigationRoutes.viewProfile(chiropractor.id))
                             }
                         )
                     }
@@ -202,6 +213,14 @@ fun ChiroScreenPreview() {
                 onSearchClick = { }
             )
             
+            // Search bar preview
+            SimpleMessageSearch(
+                searchQuery = "",
+                onSearchQueryChange = { },
+                placeholder = "Search chiropractors...",
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
             // Sample preview data
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -217,7 +236,8 @@ fun ChiroScreenPreview() {
                             location = "Makati City",
                             isAvailable = true,
                             yearsOfExperience = 8,
-                            reviewCount = 45
+                            reviewCount = 45,
+                            profileImageUrl = "https://firebasestorage.googleapis.com/v0/b/truespine-e8576.firebasestorage.app/o/profile_images%2FGHkvU5c8c4SZHqK63HwJ18TDvEZ2%2F1765126305341.jpg?alt=media&token=2c69eae4-1f8d-4bf7-bc87-74fdbde77507"
                         ),
                         onBookClick = { },
                         onViewProfileClick = { }

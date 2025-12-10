@@ -3,10 +3,12 @@ package com.brightcare.patient.ui.component.messagecomponent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -14,37 +16,96 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.brightcare.patient.ui.theme.*
+import kotlinx.coroutines.launch
 
 /**
- * Conversations list component
- * Lista component ng mga conversation
+ * Conversations list component with refresh functionality
+ * Lista component ng mga conversation na may refresh functionality
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationsList(
     conversations: List<ChatConversation>,
     onConversationClick: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {}
 ) {
-    if (conversations.isEmpty()) {
-        // Empty state - Walang conversation
-        EmptyConversationsState(modifier = modifier)
-    } else {
-        LazyColumn(
-            modifier = modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    
+    Box(modifier = modifier.fillMaxSize()) {
+        if (conversations.isEmpty()) {
+            // Empty state - Walang conversation
+            EmptyConversationsState(modifier = Modifier.fillMaxSize())
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Add refresh indicator at the top when refreshing
+                if (isRefreshing) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Blue500
+                                )
+                                Text(
+                                    text = "Refreshing...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Gray600
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                items(conversations) { conversation ->
+                    ConversationCard(
+                        conversation = conversation,
+                        onClick = { onConversationClick(conversation.id) }
+                    )
+                }
+                
+                // Add bottom padding
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+        
+        // Floating refresh button
+        FloatingActionButton(
+            onClick = {
+                onRefresh()
+                // Scroll to top to show refresh indicator
+                coroutineScope.launch {
+                    listState.animateScrollToItem(0)
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = Blue500,
+            contentColor = White
         ) {
-            items(conversations) { conversation ->
-                ConversationCard(
-                    conversation = conversation,
-                    onClick = { onConversationClick(conversation.id) }
-                )
-            }
-            
-            // Add bottom padding
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Refresh conversations / I-refresh ang mga conversation"
+            )
         }
     }
 }
@@ -99,12 +160,13 @@ fun EmptyConversationsState(
 @Preview(showBackground = true)
 @Composable
 fun ConversationsListPreview() {
-    val sampleConversations = getSampleConversations()
-    
+    // Preview with empty list - real data comes from Firestore
     BrightCarePatientTheme {
         ConversationsList(
-            conversations = sampleConversations,
-            onConversationClick = { /* Preview action */ }
+            conversations = emptyList(),
+            onConversationClick = { /* Preview action */ },
+            isRefreshing = false,
+            onRefresh = { /* Preview refresh action */ }
         )
     }
 }
@@ -119,3 +181,10 @@ fun EmptyConversationsStatePreview() {
         EmptyConversationsState()
     }
 }
+
+
+
+
+
+
+

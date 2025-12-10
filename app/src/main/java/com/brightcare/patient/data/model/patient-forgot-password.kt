@@ -83,10 +83,10 @@ data class ForgotPasswordUiState(
  * Toast messages for forgot password flow
  */
 object ForgotPasswordToastMessages {
-    const val RESET_LINK_SENT_SUCCESS = "Password reset link sent to your email successfully! Please check your inbox."
+    const val RESET_LINK_SENT_SUCCESS = "If an account with this email exists, a password reset link has been sent. Please check your inbox and spam folder."
     
     // Error messages
-    const val EMAIL_NOT_FOUND = "No account found with this email address"
+    const val EMAIL_NOT_FOUND = "No account found with this email address"  // This won't be used anymore
     const val NETWORK_ERROR = "Network error. Please check your connection and try again"
     
     // Action labels

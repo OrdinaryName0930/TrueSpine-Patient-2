@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isParticipant(participantIds) {
+      return request.auth.uid in participantIds;
+    }
+    
+    function isPatient() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "patient";
+    }
+    
+    function isChiropractor() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "chiropractor";
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own document
+      allow read, write: if isAuthenticated() && isOwner(userId);
+      
+      // Patients can read chiropractor profiles
+      allow read: if isAuthenticated() && 
+        isPatient() && 
+        resource.data.role == "chiropractor";
+      
+      // Chiropractors can read patient profiles (for conversations)
+      allow read: if isAuthenticated() && 
+        isChiropractor() && 
+        resource.data.role == "patient";
+    }
+    
+    // Chiropractors collection - patients can read all chiropractor profiles
+    match /chiropractors/{chiropractorId} {
+      // Patients can read all chiropractor profiles
+      allow read: if isAuthenticated();
+      
+      // Chiropractors can read and write their own profile
+      allow read, write: if isAuthenticated() && isOwner(chiropractorId);
+      
+      // Admin/system can write (for initial setup)
+      allow write: if isAuthenticated();
+    }
+    
+    // Conversations collection
+    match /conversations/{conversationId} {
+      // Allow read/write only for conversation participants
+      allow read, write: if isAuthenticated() && 
+        isParticipant(resource.data.participants);
+      
+      // Allow creation if user is one of the participants
+      allow create: if isAuthenticated() && 
+        isParticipant(request.resource.data.participants);
+      
+      // Messages subcollection
+      match /messages/{messageId} {
+        // Allow read for conversation participants
+        allow read: if isAuthenticated() && 
+          isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants);
+        
+        // Allow write for conversation participants
+        allow write: if isAuthenticated() && 
+          isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants);
+        
+        // Allow creation if user is sender and part of conversation
+        allow create: if isAuthenticated() && 
+          isOwner(request.resource.data.senderId) &&
+          isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants);
+        
+        // Allow update for message status (read, delivered, etc.)
+        allow update: if isAuthenticated() && 
+          isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants);
+        
+        // Allow delete only for message sender
+        allow delete: if isAuthenticated() && 
+          isOwner(resource.data.senderId);
+      }
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// Firebase Storage Security Rules
+// Add this to your Firebase Storage rules
+/*
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isParticipantInConversation(conversationId) {
+      return request.auth != null &&
+        request.auth.uid in firestore.get(/databases/(default)/documents/conversations/$(conversationId)).data.participants;
+    }
+    
+    // Conversation files - only participants can upload/download
+    match /conversations/{conversationId}/{allPaths=**} {
+      allow read, write: if isAuthenticated() && 
+        isParticipantInConversation(conversationId);
+    }
+    
+    // User profile images - only owner can upload/update
+    match /users/{userId}/profile/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+*/

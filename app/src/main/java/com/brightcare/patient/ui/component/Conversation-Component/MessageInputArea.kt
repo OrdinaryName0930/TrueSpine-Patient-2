@@ -32,8 +32,9 @@ fun MessageInputArea(
     messageText: String,
     onMessageTextChange: (String) -> Unit,
     onSendMessage: () -> Unit,
-    onAttachmentClick: () -> Unit = {},
     onImageClick: () -> Unit = {},
+    onCameraClick: () -> Unit = {},
+    onDocumentClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showAttachmentOptions by remember { mutableStateOf(false) }
@@ -58,16 +59,12 @@ fun MessageInputArea(
                         onImageClick()
                         showAttachmentOptions = false
                     },
-                    onFileClick = {
-                        onAttachmentClick()
-                        showAttachmentOptions = false
-                    },
                     onCameraClick = {
-                        // TODO: Implement camera capture
+                        onCameraClick()
                         showAttachmentOptions = false
                     },
                     onDocumentClick = {
-                        // TODO: Implement document picker
+                        onDocumentClick()
                         showAttachmentOptions = false
                     }
                 )
@@ -154,7 +151,6 @@ fun MessageInputArea(
 @Composable
 private fun AttachmentOptionsRow(
     onImageClick: () -> Unit,
-    onFileClick: () -> Unit,
     onCameraClick: () -> Unit,
     onDocumentClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -164,7 +160,8 @@ private fun AttachmentOptionsRow(
             .fillMaxWidth()
             .background(Gray50)
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         // Image gallery
         AttachmentOption(
@@ -179,27 +176,18 @@ private fun AttachmentOptionsRow(
         AttachmentOption(
             icon = Icons.Default.CameraAlt,
             label = "Camera",
-            backgroundColor = Blue100,
-            iconColor = Blue500,
+            backgroundColor = Green100,
+            iconColor = Green500,
             onClick = onCameraClick
         )
         
-        // Document
+        // Document (PDF and docs)
         AttachmentOption(
             icon = Icons.Default.Description,
             label = "Document",
             backgroundColor = Orange100,
             iconColor = Orange500,
             onClick = onDocumentClick
-        )
-        
-        // File
-        AttachmentOption(
-            icon = Icons.Default.AttachFile,
-            label = "File",
-            backgroundColor = Gray100,
-            iconColor = Gray600,
-            onClick = onFileClick
         )
     }
 }
@@ -265,7 +253,7 @@ fun MessageInputAreaPreview() {
                 onMessageTextChange = {},
                 onSendMessage = {}
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
             
             // Input with text

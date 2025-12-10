@@ -1,5 +1,6 @@
 package com.brightcare.patient.ui.component.messagecomponent
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,11 +10,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.brightcare.patient.ui.theme.*
 import java.util.*
 
@@ -33,10 +37,18 @@ fun ConversationCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (conversation.unreadCount > 0) Blue50 else White
+            containerColor = when {
+                conversation.hasNewMessage || conversation.unreadCount > 0 -> Blue50
+                else -> White
+            }
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(12.dp)
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (conversation.hasNewMessage || conversation.unreadCount > 0) 4.dp else 2.dp
+        ),
+        shape = RoundedCornerShape(12.dp),
+        border = if (conversation.hasNewMessage || conversation.unreadCount > 0) {
+            androidx.compose.foundation.BorderStroke(1.dp, Blue200)
+        } else null
     ) {
         Row(
             modifier = Modifier
@@ -44,10 +56,12 @@ fun ConversationCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar with online indicator
+            // Avatar with online indicator and new message indicator
             ConversationAvatar(
                 participantType = conversation.participantType,
-                isOnline = conversation.isOnline
+                isOnline = conversation.isOnline,
+                profileImageUrl = conversation.profileImageUrl,
+                hasNewMessage = conversation.hasNewMessage || conversation.unreadCount > 0
             )
             
             Spacer(modifier = Modifier.width(12.dp))
@@ -70,34 +84,50 @@ fun ConversationCard(
 fun ConversationAvatar(
     participantType: SenderType,
     isOnline: Boolean,
+    profileImageUrl: String? = null,
+    hasNewMessage: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier) {
-        Surface(
-            modifier = Modifier.size(48.dp),
-            shape = CircleShape,
-            color = when (participantType) {
-                SenderType.DOCTOR -> Blue100
-                SenderType.ADMIN -> Orange100
-                SenderType.PATIENT -> Gray200
-            }
-        ) {
-            Icon(
-                imageVector = when (participantType) {
-                    SenderType.DOCTOR -> Icons.Default.LocalHospital
-                    SenderType.ADMIN -> Icons.Default.Support
-                    SenderType.PATIENT -> Icons.Default.Person
-                },
-                contentDescription = null,
-                tint = when (participantType) {
-                    SenderType.DOCTOR -> Blue500
-                    SenderType.ADMIN -> Orange500
-                    SenderType.PATIENT -> Gray600
-                },
+        if (!profileImageUrl.isNullOrBlank()) {
+            // Display actual profile image
+            AsyncImage(
+                model = profileImageUrl,
+                contentDescription = "Profile picture",
                 modifier = Modifier
-                    .size(24.dp)
-                    .wrapContentSize(Alignment.Center)
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Gray100),
+                contentScale = ContentScale.Crop
             )
+        } else {
+            // Fallback to icon-based avatar
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = when (participantType) {
+                    SenderType.DOCTOR -> Blue100
+                    SenderType.ADMIN -> Orange100
+                    SenderType.PATIENT -> Gray200
+                }
+            ) {
+                Icon(
+                    imageVector = when (participantType) {
+                        SenderType.DOCTOR -> Icons.Default.LocalHospital
+                        SenderType.ADMIN -> Icons.Default.Support
+                        SenderType.PATIENT -> Icons.Default.Person
+                    },
+                    contentDescription = null,
+                    tint = when (participantType) {
+                        SenderType.DOCTOR -> Blue500
+                        SenderType.ADMIN -> Orange500
+                        SenderType.PATIENT -> Gray600
+                    },
+                    modifier = Modifier
+                        .size(24.dp)
+                        .wrapContentSize(Alignment.Center)
+                )
+            }
         }
         
         // Online indicator
@@ -108,6 +138,18 @@ fun ConversationAvatar(
                     .align(Alignment.BottomEnd),
                 shape = CircleShape,
                 color = Success,
+                border = androidx.compose.foundation.BorderStroke(2.dp, White)
+            ) {}
+        }
+        
+        // New message indicator (red dot)
+        if (hasNewMessage) {
+            Surface(
+                modifier = Modifier
+                    .size(12.dp)
+                    .align(Alignment.TopEnd),
+                shape = CircleShape,
+                color = androidx.compose.ui.graphics.Color.Red,
                 border = androidx.compose.foundation.BorderStroke(2.dp, White)
             ) {}
         }
@@ -135,8 +177,8 @@ fun ConversationContent(
             Text(
                 text = conversation.participantName,
                 style = MaterialTheme.typography.titleSmall.copy(
-                    fontWeight = if (conversation.unreadCount > 0) FontWeight.Bold else FontWeight.SemiBold,
-                    color = Gray900
+                    fontWeight = if (conversation.hasNewMessage || conversation.unreadCount > 0) FontWeight.Bold else FontWeight.SemiBold,
+                    color = if (conversation.hasNewMessage || conversation.unreadCount > 0) Gray900 else Gray800
                 ),
                 modifier = Modifier.weight(1f)
             )
@@ -144,8 +186,8 @@ fun ConversationContent(
             Text(
                 text = timeText,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    color = if (conversation.unreadCount > 0) Blue500 else Gray500,
-                    fontWeight = if (conversation.unreadCount > 0) FontWeight.SemiBold else FontWeight.Normal
+                    color = if (conversation.hasNewMessage || conversation.unreadCount > 0) Blue500 else Gray500,
+                    fontWeight = if (conversation.hasNewMessage || conversation.unreadCount > 0) FontWeight.SemiBold else FontWeight.Normal
                 )
             )
         }
@@ -160,17 +202,20 @@ fun ConversationContent(
             Text(
                 text = conversation.lastMessage,
                 style = MaterialTheme.typography.bodySmall.copy(
-                    color = if (conversation.unreadCount > 0) Gray800 else Gray600,
-                    fontWeight = if (conversation.unreadCount > 0) FontWeight.Medium else FontWeight.Normal
+                    color = if (conversation.hasNewMessage || conversation.unreadCount > 0) Gray800 else Gray600,
+                    fontWeight = if (conversation.hasNewMessage || conversation.unreadCount > 0) FontWeight.Medium else FontWeight.Normal
                 ),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
             
-            // Unread count badge
+            // Unread count badge or new message indicator
             if (conversation.unreadCount > 0) {
                 UnreadCountBadge(count = conversation.unreadCount)
+            } else if (conversation.hasNewMessage) {
+                // Show "NEW" indicator when there's a new message but no specific count
+                NewMessageIndicator()
             }
         }
     }
@@ -208,6 +253,32 @@ fun UnreadCountBadge(
 }
 
 /**
+ * New message indicator component
+ * Indicator component para sa bagong mensahe
+ */
+@Composable
+fun NewMessageIndicator(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .padding(start = 8.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = androidx.compose.ui.graphics.Color.Red
+    ) {
+        Text(
+            text = "NEW",
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 9.sp
+            ),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+    }
+}
+
+/**
  * Preview for ConversationCard
  */
 @Preview(showBackground = true)
@@ -220,13 +291,51 @@ fun ConversationCardPreview() {
         lastMessage = "Your next appointment is confirmed for tomorrow at 10 AM. Please arrive 15 minutes early.",
         lastMessageTime = Calendar.getInstance().apply { add(Calendar.HOUR, -2) }.time,
         unreadCount = 2,
-        isOnline = true
+        isOnline = true,
+        profileImageUrl = "https://example.com/profile.jpg", // Sample profile image URL
+        hasNewMessage = true, // Show new message indicator
+        phoneNumber = "+63 912 345 6789",
+        specialization = "Chiropractor"
     )
     
     BrightCarePatientTheme {
-        ConversationCard(
-            conversation = sampleConversation,
-            onClick = { /* Preview action */ }
-        )
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Card with unread count
+            ConversationCard(
+                conversation = sampleConversation,
+                onClick = { /* Preview action */ }
+            )
+            
+            // Card with new message indicator only
+            ConversationCard(
+                conversation = sampleConversation.copy(
+                    unreadCount = 0,
+                    hasNewMessage = true,
+                    participantName = "Dr. John Doe",
+                    lastMessage = "Hello! I have reviewed your test results."
+                ),
+                onClick = { /* Preview action */ }
+            )
+            
+            // Normal card without indicators
+            ConversationCard(
+                conversation = sampleConversation.copy(
+                    unreadCount = 0,
+                    hasNewMessage = false,
+                    participantName = "Dr. Sarah Wilson",
+                    lastMessage = "Please remember to take your medication."
+                ),
+                onClick = { /* Preview action */ }
+            )
+        }
     }
 }
+
+
+
+
+
+
+

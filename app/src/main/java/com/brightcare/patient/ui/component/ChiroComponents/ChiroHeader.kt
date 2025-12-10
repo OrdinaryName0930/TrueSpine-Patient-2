@@ -47,18 +47,7 @@ fun ChiroHeader(
             )
         }
 
-        IconButton(
-            onClick = onSearchClick,
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = Blue50
-            )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = "Search",
-                tint = Blue500
-            )
-        }
+
     }
 }
 

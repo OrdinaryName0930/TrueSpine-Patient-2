@@ -49,11 +49,12 @@ class PatientForgotPasswordViewModel @Inject constructor(
                     return@launch
                 }
                 
-                // Update UI state to loading
+                // Update UI state to loading and clear previous results
                 _uiState.value = _uiState.value.copy(
                     isSendingResetLink = true,
                     email = email.lowercase(),
                     errorMessage = null,
+                    sendResetLinkResult = null, // Clear previous result before new attempt
                     validationState = ForgotPasswordValidationState()
                 )
                 
@@ -77,8 +78,12 @@ class PatientForgotPasswordViewModel @Inject constructor(
                     }
                     
                     is ForgotPasswordResult.Error -> {
+                        Log.d(TAG, "Processing forgot password error: ${result.exception}")
                         val errorMessage = when (result.exception) {
-                            is ForgotPasswordException.EmailNotFound -> ForgotPasswordToastMessages.EMAIL_NOT_FOUND
+                            is ForgotPasswordException.EmailNotFound -> {
+                                Log.d(TAG, "Email not found - setting error result")
+                                ForgotPasswordToastMessages.EMAIL_NOT_FOUND
+                            }
                             is ForgotPasswordException.NetworkError -> ForgotPasswordToastMessages.NETWORK_ERROR
                             else -> result.exception.message ?: "Failed to send reset link"
                         }
@@ -119,7 +124,7 @@ class PatientForgotPasswordViewModel @Inject constructor(
             email = email.lowercase(),
             validationState = validation,
             errorMessage = null, // Clear error message when user types
-            sendResetLinkResult = null, // Clear previous send reset link result when user types
+            // Don't clear sendResetLinkResult immediately - let it persist until next attempt
             showErrorDialog = false
         )
     }

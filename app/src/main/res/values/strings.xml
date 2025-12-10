@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">BrightCare Patient</string>
+    <string name="app_name">TrueSpine Patient</string>
     
     <!-- Facebook Configuration -->
     <!-- TODO: Replace these with your actual Facebook App ID and Client Token -->

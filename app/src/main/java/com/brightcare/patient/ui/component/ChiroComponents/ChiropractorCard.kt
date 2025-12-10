@@ -3,6 +3,7 @@ package com.brightcare.patient.ui.component.chirocomponents
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.brightcare.patient.ui.theme.*
 
 /**
@@ -39,7 +41,8 @@ fun ChiropractorCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .clickable { onViewProfileClick() },
         colors = CardDefaults.cardColors(containerColor = White),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         shape = RoundedCornerShape(16.dp)
@@ -76,7 +79,7 @@ fun ChiropractorCard(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = "Licensed Chiropractor",
+                            text = "Chiropractor",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 color = Blue500,
                                 fontWeight = FontWeight.Bold
@@ -101,14 +104,25 @@ fun ChiropractorCard(
                         .background(Gray100),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Placeholder for doctor image - using initials
-                    Text(
-                        text = chiropractor.name.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString(""),
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Blue500
+                    if (chiropractor.profileImageUrl.isNotEmpty()) {
+                        AsyncImage(
+                            model = chiropractor.profileImageUrl,
+                            contentDescription = "Doctor ${chiropractor.name}",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
                         )
-                    )
+                    } else {
+                        // Fallback to initials if no image URL
+                        Text(
+                            text = chiropractor.name.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString(""),
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Blue500
+                            )
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -188,7 +202,7 @@ fun ChiropractorCard(
             
             // Action Buttons
             ChiropractorCardActions(
-                isAvailable = chiropractor.isAvailable,
+                isAvailable = true, // Always available for booking
                 onBookClick = onBookClick,
                 onViewProfileClick = onViewProfileClick
             )
@@ -237,18 +251,16 @@ private fun ChiropractorCardActions(
         Button(
             onClick = onBookClick,
             modifier = Modifier.weight(1f),
-            enabled = isAvailable,
+            enabled = true, // Always enabled
             colors = ButtonDefaults.buttonColors(
                 containerColor = Blue500,
-                contentColor = White,
-                disabledContainerColor = Gray300,
-                disabledContentColor = Gray500
+                contentColor = White
             ),
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(vertical = 14.dp)
         ) {
             Text(
-                text = if (isAvailable) "Book Now" else "Unavailable",
+                text = "Book Now", // Always show "Book Now"
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontWeight = FontWeight.SemiBold
                 )
@@ -270,7 +282,9 @@ fun ChiropractorCardPreview() {
                 experience = "8 years",
                 rating = 4.8f,
                 location = "Makati City",
-                isAvailable = true
+                isAvailable = true,
+                profileImageUrl = "https://firebasestorage.googleapis.com/v0/b/truespine-e8576.firebasestorage.app/o/profile_images%2FoCxcARqFoRXmYOJ2ipm7xCZXf9p1%2F1765169538809.jpg?alt=media&token=48d29c2c-8fae-4201-ab40-032ff5e895a0",
+                reviewCount = 45
             ),
             onBookClick = { },
             onViewProfileClick = { }

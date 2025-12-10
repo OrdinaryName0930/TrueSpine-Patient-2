@@ -30,18 +30,13 @@ fun MessageComponent(
     var isSearchActive by remember { mutableStateOf(false) }
     var selectedSenderType by remember { mutableStateOf<SenderType?>(null) }
 
-    // Sample conversation data - Mga sample na conversation
-    val conversations = remember {
-        getSampleConversations()
-    }
+    // Real conversation data comes from Firestore through ConversationsViewModel
+    // For preview purposes, use empty list
+    val conversations = remember { emptyList<ChatConversation>() }
 
     // Apply search and filter logic
     val filteredConversations = remember(searchQuery, selectedSenderType, conversations) {
-        searchConversations(
-            conversations = conversations,
-            query = searchQuery,
-            senderTypeFilter = selectedSenderType
-        )
+        filterConversations(conversations, searchQuery)
     }
 
     Column(
@@ -77,7 +72,7 @@ fun MessageComponent(
             ) {
                 Text(
                     text = if (filteredConversations.isNotEmpty()) {
-                        "Found ${filteredConversations.size} of ${conversations.size} conversations"
+                        "Found ${filteredConversations.size} conversations"
                     } else {
                         "No conversations found"
                     },
@@ -113,3 +108,10 @@ fun MessageComponentPreview() {
         )
     }
 }
+
+
+
+
+
+
+

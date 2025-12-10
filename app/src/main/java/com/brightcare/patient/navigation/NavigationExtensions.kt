@@ -2,6 +2,7 @@ package com.brightcare.patient.navigation
 
 import androidx.navigation.NavController
 import androidx.navigation.NavOptions
+import android.util.Log
 
 /**
  * Extension functions for navigation to provide type-safe navigation
@@ -83,15 +84,22 @@ fun NavController.navigateAfterLogin(
     isProfileComplete: Boolean,
     clearBackStack: Boolean = true
 ) {
+    Log.d("NavigationExtensions", "navigateAfterLogin called:")
+    Log.d("NavigationExtensions", "  - isEmailVerified: $isEmailVerified")
+    Log.d("NavigationExtensions", "  - isProfileComplete: $isProfileComplete")
+    
     when {
         !isEmailVerified -> {
+            Log.d("NavigationExtensions", "  - Action: Staying on login (email not verified)")
             // Stay on login screen, show email verification dialog
             // This should be handled by the UI, not navigation
         }
         !isProfileComplete -> {
+            Log.d("NavigationExtensions", "  - Action: Navigating to Complete Profile")
             navigateToCompleteProfile(clearBackStack)
         }
         else -> {
+            Log.d("NavigationExtensions", "  - Action: Navigating to Home")
             navigateToHome(clearBackStack)
         }
     }

@@ -1,34 +1,169 @@
 package com.brightcare.patient.ui.screens
 
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import com.brightcare.patient.ui.component.messagecomponent.MessageComponent
-import com.brightcare.patient.ui.theme.BrightCarePatientTheme
+import com.brightcare.patient.ui.component.conversationcomponent.ConversationComponent
+import com.brightcare.patient.ui.component.messagecomponent.SimpleMessageSearch
+import com.brightcare.patient.ui.viewmodel.ConversationListViewModel
+import com.brightcare.patient.ui.viewmodel.ChiropractorDisplayItem
+import com.brightcare.patient.ui.theme.*
 import com.brightcare.patient.navigation.NavigationRoutes
+import com.brightcare.patient.ui.component.chirocomponents.*
 
 /**
  * Message screen - Chat with healthcare providers
  * Screen para sa pakikipag-chat sa mga healthcare provider
+ * Following ChiroScreen structure with integrated search functionality
  */
 @Composable
 fun MessageScreen(
     navController: NavController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: ConversationListViewModel = hiltViewModel()
 ) {
-    // Use the MessageComponent with all functionality including search
-    // Gamitin ang MessageComponent na may lahat ng functionality kasama ang search
-    MessageComponent(
-        navController = navController,
-        modifier = modifier,
-        onConversationClick = { conversationId ->
-            // Navigate to conversation screen
-            // Pumunta sa conversation screen
-            navController.navigate(NavigationRoutes.conversation(conversationId))
+    // Collect state from ViewModel (similar to ChiroScreen pattern)
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val displayChiropractors by viewModel.getDisplayChiropractors().collectAsStateWithLifecycle()
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(WhiteBg)
+            .padding(
+                start = 12.dp,
+                top = 16.dp,
+                end = 12.dp
+            )
+    ) {
+        // Header (following ChiroScreen pattern)
+        ChiroHeader(
+            title = "Messages",
+            subtitle = "Chat with chiropractors",
+            onSearchClick = { 
+                // Focus on search - could expand search functionality here
+                // For now, just refresh the data
+                viewModel.refreshData()
+            }
+        )
+
+        // Search bar (maintaining SimpleMessageSearch.kt)
+        SimpleMessageSearch(
+            searchQuery = searchQuery,
+            onSearchQueryChange = viewModel::updateSearchQuery,
+            placeholder = "Search chiropractors...",
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        // Content based on loading state (following ChiroScreen pattern)
+        when {
+            uiState.isLoading -> {
+                // Loading indicator
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(
+                            color = Blue500
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Loading chiropractors...",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = Gray600
+                            )
+                        )
+                    }
+                }
+            }
+            
+            uiState.error != null -> {
+                // Error state
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Error loading chiropractors",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                color = Error,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        Text(
+                            text = uiState.error ?: "Unknown error occurred",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = Gray600
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { viewModel.refreshData() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Blue500
+                            )
+                        ) {
+                            Text("Retry")
+                        }
+                    }
+                }
+            }
+            
+            displayChiropractors.isEmpty() -> {
+                // Empty state
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = if (searchQuery.isNotEmpty()) "No chiropractors found" else "No chiropractors available",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                color = Gray600,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        Text(
+                            text = if (searchQuery.isNotEmpty()) "Try adjusting your search" else "Please try again later",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = Gray500
+                            )
+                        )
+                    }
+                }
+            }
+            
+            else -> {
+                // Chiropractors list using ConversationComponent
+                // This maintains the existing functionality while following ChiroScreen structure
+                ConversationComponent(
+                    navController = navController,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
-    )
+    }
 }
 
 
@@ -41,8 +176,42 @@ fun MessageScreen(
 @Composable
 fun MessageScreenPreview() {
     BrightCarePatientTheme {
-        MessageScreen(
-            navController = rememberNavController()
-        )
+        // Preview with sample UI structure since we can't use ViewModel in preview
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(WhiteBg)
+                .padding(
+                    start = 12.dp,
+                    top = 16.dp,
+                    end = 12.dp
+                )
+        ) {
+            ChiroHeader(
+                title = "Messages",
+                subtitle = "Chat with chiropractors",
+                onSearchClick = { }
+            )
+            
+            SimpleMessageSearch(
+                searchQuery = "",
+                onSearchQueryChange = { },
+                placeholder = "Search chiropractors...",
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
+            // Sample preview - in real app, ConversationComponent will show here
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Chiropractors will appear here",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = Gray600
+                    )
+                )
+            }
+        }
     }
 }

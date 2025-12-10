@@ -17,6 +17,11 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AuthModule {
 
+
+    /**
+     * Provides AuthenticationManager instance
+     * Note: We need to provide this manually because the constructor needs @ApplicationContext
+     */
     @Provides
     @Singleton
     fun provideAuthenticationManager(

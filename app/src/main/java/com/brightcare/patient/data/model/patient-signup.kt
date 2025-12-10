@@ -28,7 +28,8 @@ data class SignUpResponse(
     val isEmailVerified: Boolean,
     val displayName: String? = null,
     val photoUrl: String? = null,
-    val providerId: String // "password", "google.com", "facebook.com"
+    val providerId: String, // "password", "google.com", "facebook.com"
+    val isProfileComplete: Boolean = false // Whether user has completed their profile
 )
 
 /**
@@ -42,6 +43,7 @@ sealed class AuthResult {
 
 /**
  * Custom exception for authentication errors
+ * Enhanced with timeout and slow network handling
  */
 sealed class AuthException(message: String) : Exception(message) {
     object EmailAlreadyInUse : AuthException("The email address is already in use by another account.")
@@ -51,7 +53,23 @@ sealed class AuthException(message: String) : Exception(message) {
     object UserDisabled : AuthException("This user account has been disabled.")
     object TooManyRequests : AuthException("Too many requests. Please try again later.")
     object OperationNotAllowed : AuthException("This operation is not allowed.")
+    
+    // Enhanced network/timeout exceptions for slow internet handling
+    object TimeoutError : AuthException("Connection timed out. Your internet may be slow. Please try again.")
+    object NoNetworkConnection : AuthException("No internet connection. Please check your network and try again.")
+    object SlowNetworkError : AuthException("Your internet connection is slow. The operation is taking longer than expected.")
+    data class RetryableError(val originalMessage: String, val attemptsMade: Int) : 
+        AuthException("Failed after $attemptsMade attempts: $originalMessage. Please try again.")
+    
     data class Unknown(val originalMessage: String) : AuthException("An unknown error occurred: $originalMessage")
+    
+    companion object {
+        /**
+         * User-friendly messages for slow connection scenarios
+         */
+        const val SLOW_NETWORK_TIP = "Tip: Move to an area with better signal or try using Wi-Fi."
+        const val RETRY_MESSAGE = "Please tap to try again."
+    }
 }
 
 /**
@@ -107,6 +125,7 @@ data class EmailVerificationState(
 data class FirestoreUserData(
     val email: String = "",
     val deviceId: String = "",
+    val profileCompleted: Boolean = false, // Explicitly set to false for new users
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {

@@ -100,6 +100,10 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation("com.google.firebase:firebase-functions-ktx:20.4.0")
+    implementation("com.google.firebase:firebase-storage-ktx:21.0.1")
+    
+    // Image loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
     // Credential API / Google Sign-In
     implementation(libs.androidx.credentials)

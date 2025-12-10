@@ -89,9 +89,9 @@ class PatientSignInViewModel @Inject constructor(
             _validationState.value = _validationState.value.copy(emailError = null)
             updateUiState()
         }
-        // Clear error message and credential error when user starts typing
+        // Clear error message when user starts typing, but keep credential error until new login attempt
         clearErrorMessage()
-        clearCredentialError()
+        // Don't clear credential error immediately - let it persist until next login attempt
     }
     
     /**
@@ -104,9 +104,9 @@ class PatientSignInViewModel @Inject constructor(
             _validationState.value = _validationState.value.copy(passwordError = null)
             updateUiState()
         }
-        // Clear error message and credential error when user starts typing
+        // Clear error message when user starts typing, but keep credential error until new login attempt
         clearErrorMessage()
-        clearCredentialError()
+        // Don't clear credential error immediately - let it persist until next login attempt
     }
     
     /**
@@ -129,6 +129,9 @@ class PatientSignInViewModel @Inject constructor(
                     updateUiState()
                     return@launch
                 }
+                
+                // Clear previous credential errors before new attempt
+                clearCredentialError()
                 
                 // Set email/password loading state
                 setEmailPasswordLoading(true)
@@ -432,17 +435,44 @@ class PatientSignInViewModel @Inject constructor(
         val currentValidation = _validationState.value
         
         // Set error message and credential error based on login result
-        val (errorMessage, credentialError) = when (currentResult) {
+        val (errorMessage, credentialError, isRetryable) = when (currentResult) {
             is LoginResult.Error -> {
+                Log.d(TAG, "Processing login error: ${currentResult.exception}")
                 when (currentResult.exception) {
-                    is LoginException.EmailNotVerified -> Pair(null, null) // Handle separately with dialog
-                    is LoginException.UserNotFound -> Pair(null, "Account does not exist")
-                    is LoginException.InvalidCredential -> Pair(null, "Incorrect login credentials")
-                    is LoginException.UserDisabled -> Pair("This user account has been disabled.", null) // Keep in error card
-                    is LoginException.Unknown -> Pair("Something went wrong. Please try again.", null) // Keep in error card
+                    is LoginException.EmailNotVerified -> Triple(null, null, false) // Handle separately with dialog
+                    is LoginException.UserNotFound -> {
+                        Log.d(TAG, "User not found - setting credential error")
+                        Triple(null, "Account does not exist", false)
+                    }
+                    is LoginException.InvalidCredential -> {
+                        Log.d(TAG, "Invalid credential - setting credential error")
+                        Triple(null, "Incorrect login credentials", false)
+                    }
+                    is LoginException.UserDisabled -> Triple("This user account has been disabled.", null, false) // Keep in error card
+                    is LoginException.TimeoutError -> Triple(
+                        "Connection timed out due to a slow internet connection. Please try again or move to a place with a better signal.", 
+                        null, 
+                        true
+                    )
+                    is LoginException.NoNetworkConnection -> Triple(
+                        "No internet connection. Please check your network and try again.", 
+                        null, 
+                        true
+                    )
+                    is LoginException.SlowNetworkError -> Triple(
+                        "Your internet connection is slow. Please wait or move to an area with better signal.", 
+                        null, 
+                        true
+                    )
+                    is LoginException.RetryableError -> Triple(
+                        "Failed after ${currentResult.exception.attemptsMade} attempts. Please check your connection and try again.", 
+                        null, 
+                        true
+                    )
+                    is LoginException.Unknown -> Triple("Something went wrong. Please try again.", null, false) // Keep in error card
                 }
             }
-            else -> Pair(_uiState.value.errorMessage, _uiState.value.credentialError) // Keep existing values
+            else -> Triple(_uiState.value.errorMessage, _uiState.value.credentialError, _uiState.value.isRetryable) // Keep existing values
         }
         
         _uiState.value = _uiState.value.copy(
@@ -454,8 +484,11 @@ class PatientSignInViewModel @Inject constructor(
                 else -> null
             },
             errorMessage = errorMessage,
-            credentialError = credentialError
+            credentialError = credentialError,
+            isRetryable = isRetryable
         )
+        
+        Log.d(TAG, "UI State updated - credentialError: $credentialError, errorMessage: $errorMessage")
     }
     
     /**
@@ -482,6 +515,8 @@ class PatientSignInViewModel @Inject constructor(
             try {
                 Log.d(TAG, "Signing out user")
                 loginRepository.signOut()
+                // Clear persistent authentication state
+                authenticationManager.clearLoginState()
                 clearForm()
                 _loginResult.value = null
                 // Clear all UI state to prevent automatic redirects

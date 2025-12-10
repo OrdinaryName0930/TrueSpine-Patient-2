@@ -177,6 +177,7 @@ class PatientSignUpViewModel(
     
     /**
      * Handle authentication errors and update UI state accordingly
+     * Enhanced with slow network error handling
      */
     private fun handleAuthError(exception: AuthException) {
         when (exception) {
@@ -201,7 +202,36 @@ class PatientSignUpViewModel(
             is AuthException.NetworkError -> {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "Network error. Please check your internet connection."
+                    errorMessage = "Network error. Please check your internet connection and try again.",
+                    isRetryable = true
+                )
+            }
+            is AuthException.TimeoutError -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Connection timed out due to a slow internet connection. Please try again or move to a place with a better connection.",
+                    isRetryable = true
+                )
+            }
+            is AuthException.NoNetworkConnection -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "No internet connection. Please check your network and try again.",
+                    isRetryable = true
+                )
+            }
+            is AuthException.SlowNetworkError -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Your internet connection is slow. Please wait or move to an area with better signal.",
+                    isRetryable = true
+                )
+            }
+            is AuthException.RetryableError -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Failed after ${exception.attemptsMade} attempts. Please check your connection and try again.",
+                    isRetryable = true
                 )
             }
             is AuthException.UserDisabled -> {
@@ -234,11 +264,14 @@ class PatientSignUpViewModel(
 
 /**
  * UI state for the signup screen
+ * Enhanced with retry support for slow network conditions
  */
 data class SignUpUiState(
     val isLoading: Boolean = false,
     val isSignUpSuccessful: Boolean = false,
     val isSocialLoginSuccessful: Boolean = false,
     val errorMessage: String? = null,
-    val emailFieldError: String? = null
+    val emailFieldError: String? = null,
+    // Indicates if the error can be resolved by retrying (e.g., network issues)
+    val isRetryable: Boolean = false
 )

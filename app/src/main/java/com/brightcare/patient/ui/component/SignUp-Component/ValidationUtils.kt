@@ -105,8 +105,8 @@ object ValidationUtils {
             age--
         }
         
-        // Age must be between 0 and 122 years (reasonable human lifespan)
-        if (age < 0 || age > 122) return false
+        // Age must be between 3 and 122 years (minimum 3 years old, reasonable human lifespan)
+        if (age < 3 || age > 122) return false
         
         return true
     }

@@ -73,7 +73,10 @@ data class ChatConversation(
     val isTyping: Boolean = false,
     val isPinned: Boolean = false,
     val isMuted: Boolean = false,
-    val avatarUrl: String? = null
+    val avatarUrl: String? = null,
+    val profileImageUrl: String? = null, // Added for compatibility
+    val phoneNumber: String? = null, // Doctor's phone number for calling
+    val specialization: String? = null // Added for displaying chiropractor specialization
 )
 
 /**

@@ -105,7 +105,13 @@ fun NavigationFragment(
             when (currentRoute) {
                 "home" -> HomeScreen(navController = navController)
                 "chiro" -> ChiroScreen(navController = navController)
-                "booking" -> BookingScreen(navController = navController)
+                "booking" -> BookingScreen(
+                    navController = navController,
+                    onShowChiropractorSelection = {
+                        // Show chiropractor selection within booking screen
+                        // No navigation needed - handled internally
+                    }
+                )
                 "message" -> MessageScreen(navController = navController)
                 "profile" -> ProfileScreen(navController = navController)
                 else -> NavigationContent(currentRoute = currentRoute)

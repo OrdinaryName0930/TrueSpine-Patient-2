@@ -172,10 +172,10 @@ fun BirthDateTextField(
                 
                 val today = Calendar.getInstance()
                 val minDate = Calendar.getInstance().apply { add(Calendar.YEAR, -122) }
-                val maxDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, -1) }
+                val maxDate = Calendar.getInstance().apply { add(Calendar.YEAR, -3) } // Minimum 3 years old
                 
-                // Only accept the date if it's within valid range
-                if (selectedCalendar.after(minDate) && selectedCalendar.before(today)) {
+                // Only accept the date if it's within valid range (at least 3 years old)
+                if (selectedCalendar.after(minDate) && selectedCalendar.before(maxDate)) {
                     val formatted = String.format("%02d/%02d/%04d", month + 1, dayOfMonth, year)
                     onBirthDateChange(formatted)
                 }
@@ -185,9 +185,9 @@ fun BirthDateTextField(
             initialDate?.second ?: calendar.get(Calendar.MONTH),
             initialDate?.third ?: calendar.get(Calendar.DAY_OF_MONTH)
         ).apply {
-            // Set max date to yesterday (birth date cannot be today or future)
+            // Set max date to 3 years ago (minimum 3 years old)
             val maxCalendar = Calendar.getInstance()
-            maxCalendar.add(Calendar.DAY_OF_MONTH, -1)
+            maxCalendar.add(Calendar.YEAR, -3)
             datePicker.maxDate = maxCalendar.timeInMillis
             
             // Set min date to 122 years ago (prevent ages over 122)
