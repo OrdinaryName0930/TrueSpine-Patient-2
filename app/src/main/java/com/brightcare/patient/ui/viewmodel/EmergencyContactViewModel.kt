@@ -16,6 +16,13 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
+ * Extension function to format display names
+ * Extension function para sa pag-format ng display names
+ */
+private fun String.toDisplayName(): String =
+    lowercase().split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+
+/**
  * ViewModel for managing emergency contacts screen state and operations
  * ViewModel para sa pag-manage ng emergency contacts screen state at operations
  */
@@ -107,12 +114,19 @@ class EmergencyContactViewModel @Inject constructor(
             showAddContactDialog = true,
             editingContact = contact,
             formState = EmergencyContactFormState(
-                fullName = contact.fullName,
+                firstName = contact.firstName,
+                middleName = contact.middleName,
+                lastName = contact.lastName,
+                suffix = contact.suffix,
                 relationship = displayRelationship,
                 customRelationship = customRelationship,
                 phoneNumber = contact.phoneNumber,
                 email = contact.email,
-                address = contact.address,
+                country = contact.country,
+                province = contact.province,
+                municipality = contact.municipality,
+                barangay = contact.barangay,
+                additionalAddress = contact.additionalAddress,
                 isPrimary = contact.isPrimary
             )
         )
@@ -141,19 +155,88 @@ class EmergencyContactViewModel @Inject constructor(
     }
     
     /**
-     * Update full name with real-time validation and formatting
-     * I-update ang full name na may real-time validation at formatting
+     * Update first name with real-time validation and formatting
+     * I-update ang first name na may real-time validation at formatting
      */
-    fun updateFullName(name: String) {
-        val formattedName = EmergencyContactValidation.formatFullName(name)
-        val validation = EmergencyContactValidation.validateFullName(formattedName)
+    fun updateFirstName(firstName: String) {
+        // Allow letters and spaces
+        val filtered = firstName.filter { it.isLetter() || it == ' ' }
+        // Collapse multiple spaces in the middle
+        val collapsed = filtered.replace(Regex("\\s{2,}"), " ")
+        // Keep trailing space while typing; capitalize each word
+        val cleanValue = collapsed.toDisplayName()
+        // Trim only for validation
+        val isValid = com.brightcare.patient.ui.component.signup_component.ValidationUtils.isValidName(cleanValue.trim())
         
         updateFormState { currentState ->
             currentState.copy(
-                fullName = formattedName,
-                isFullNameError = !validation.isValid,
-                fullNameErrorMessage = validation.errorMessage
+                firstName = cleanValue,
+                isFirstNameError = cleanValue.trim().isNotBlank() && !isValid,
+                firstNameErrorMessage = if (cleanValue.trim().isNotBlank() && !isValid)
+                    "First name must be at least 2 characters and contain only letters" else ""
             )
+        }
+    }
+    
+    /**
+     * Update middle name with real-time validation and formatting
+     * I-update ang middle name na may real-time validation at formatting
+     */
+    fun updateMiddleName(middleName: String) {
+        // Allow letters and spaces
+        val filtered = middleName.filter { it.isLetter() || it == ' ' }
+        // Collapse multiple spaces in the middle
+        val collapsed = filtered.replace(Regex("\\s{2,}"), " ")
+        // Keep trailing space while typing; capitalize each word
+        val cleanValue = collapsed.toDisplayName()
+        // Middle name is optional, only validate if not blank
+        val isValid = if (cleanValue.trim().isBlank()) {
+            true
+        } else {
+            com.brightcare.patient.ui.component.signup_component.ValidationUtils.isValidName(cleanValue.trim())
+        }
+        
+        updateFormState { currentState ->
+            currentState.copy(
+                middleName = cleanValue,
+                isMiddleNameError = cleanValue.trim().isNotBlank() && !isValid,
+                middleNameErrorMessage = if (cleanValue.trim().isNotBlank() && !isValid)
+                    "Middle name must be at least 2 characters and contain only letters" else ""
+            )
+        }
+    }
+    
+    /**
+     * Update last name with real-time validation and formatting
+     * I-update ang last name na may real-time validation at formatting
+     */
+    fun updateLastName(lastName: String) {
+        // Allow letters and spaces
+        val filtered = lastName.filter { it.isLetter() || it == ' ' }
+        // Collapse multiple spaces in the middle
+        val collapsed = filtered.replace(Regex("\\s{2,}"), " ")
+        // Keep trailing space while typing; capitalize each word
+        val cleanValue = collapsed.toDisplayName()
+        // Trim only for validation
+        val isValid = com.brightcare.patient.ui.component.signup_component.ValidationUtils.isValidName(cleanValue.trim())
+        
+        updateFormState { currentState ->
+            currentState.copy(
+                lastName = cleanValue,
+                isLastNameError = cleanValue.trim().isNotBlank() && !isValid,
+                lastNameErrorMessage = if (cleanValue.trim().isNotBlank() && !isValid)
+                    "Last name must be at least 2 characters and contain only letters" else ""
+            )
+        }
+    }
+    
+    /**
+     * Update suffix
+     * I-update ang suffix
+     */
+    fun updateSuffix(suffix: String) {
+        updateFormState { currentState ->
+            currentState.copy(suffix = suffix)
         }
     }
     
@@ -233,18 +316,75 @@ class EmergencyContactViewModel @Inject constructor(
     }
     
     /**
-     * Update address with real-time validation and formatting
-     * I-update ang address na may real-time validation at formatting
+     * Update province
+     * I-update ang province
      */
-    fun updateAddress(address: String) {
-        val formattedAddress = EmergencyContactValidation.formatAddress(address)
-        val validation = EmergencyContactValidation.validateAddress(formattedAddress)
+    fun updateProvince(province: String) {
+        updateFormState { currentState ->
+            currentState.copy(
+                province = province,
+                municipality = "", // Reset dependent fields
+                barangay = "",
+                isProvinceError = false,
+                provinceErrorMessage = ""
+            )
+        }
+    }
+    
+    /**
+     * Update municipality
+     * I-update ang municipality
+     */
+    fun updateMunicipality(municipality: String) {
+        updateFormState { currentState ->
+            currentState.copy(
+                municipality = municipality,
+                barangay = "", // Reset dependent field
+                isMunicipalityError = false,
+                municipalityErrorMessage = ""
+            )
+        }
+    }
+    
+    /**
+     * Update barangay
+     * I-update ang barangay
+     */
+    fun updateBarangay(barangay: String) {
+        updateFormState { currentState ->
+            currentState.copy(
+                barangay = barangay,
+                isBarangayError = false,
+                barangayErrorMessage = ""
+            )
+        }
+    }
+    
+    /**
+     * Update additional address with validation (matching complete profile)
+     * I-update ang additional address na may validation (tumugma sa complete profile)
+     */
+    fun updateAdditionalAddress(additionalAddress: String) {
+        // Apply same formatting as complete profile
+        // Allow letters, numbers, ñ/Ñ, spaces, and punctuation
+        val allowedChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZñÑ0123456789 ,.#'-/"
+        val filtered = additionalAddress.filter { it in allowedChars }
+        
+        // Collapse multiple spaces in the middle
+        val collapsed = filtered.replace(Regex("\\s{2,}"), " ")
+        
+        // Do NOT trim trailing spaces while typing
+        val cleanValue = collapsed
+        
+        // Use same validation as complete profile
+        val isValid = com.brightcare.patient.ui.component.signup_component.ValidationUtils.isValidAdditionalAddress(cleanValue.trim())
         
         updateFormState { currentState ->
             currentState.copy(
-                address = formattedAddress,
-                isAddressError = !validation.isValid,
-                addressErrorMessage = validation.errorMessage
+                additionalAddress = cleanValue,
+                isAdditionalAddressError = cleanValue.trim().isNotBlank() && !isValid,
+                additionalAddressErrorMessage = if (cleanValue.trim().isNotBlank() && !isValid)
+                    "Additional address must be at least 3 characters long and may only contain letters, numbers, spaces, and basic punctuation (,.#'-/)." else ""
             )
         }
     }
@@ -266,13 +406,19 @@ class EmergencyContactViewModel @Inject constructor(
     fun isFormValid(): Boolean {
         val formState = _uiState.value.formState
         
-        return !formState.isFullNameError &&
+        return !formState.isFirstNameError &&
+               !formState.isMiddleNameError &&
+               !formState.isLastNameError &&
                !formState.isRelationshipError &&
                !formState.isCustomRelationshipError &&
                !formState.isPhoneNumberError &&
                !formState.isEmailError &&
-               !formState.isAddressError &&
-               formState.fullName.isNotBlank() &&
+               !formState.isProvinceError &&
+               !formState.isMunicipalityError &&
+               !formState.isBarangayError &&
+               !formState.isAdditionalAddressError &&
+               formState.firstName.trim().isNotBlank() &&
+               formState.lastName.trim().isNotBlank() &&
                formState.relationship.isNotBlank() &&
                formState.phoneNumber.isNotBlank() &&
                (formState.relationship != "Other" || formState.customRelationship.isNotBlank())
@@ -312,11 +458,18 @@ class EmergencyContactViewModel @Inject constructor(
                 
                 val contact = EmergencyContact(
                     id = currentState.editingContact?.id ?: "",
-                    fullName = formState.fullName.trim(),
+                    firstName = formState.firstName.trim(),
+                    middleName = formState.middleName.trim(),
+                    lastName = formState.lastName.trim(),
+                    suffix = formState.suffix.trim(),
                     relationship = finalRelationship,
                     phoneNumber = formState.phoneNumber.trim(),
                     email = formState.email.trim(),
-                    address = formState.address.trim(),
+                    country = formState.country,
+                    province = formState.province,
+                    municipality = formState.municipality,
+                    barangay = formState.barangay,
+                    additionalAddress = formState.additionalAddress.trim(),
                     isPrimary = finalIsPrimary,
                     createdAt = currentState.editingContact?.createdAt ?: System.currentTimeMillis()
                 )
@@ -493,64 +646,101 @@ class EmergencyContactViewModel @Inject constructor(
     }
     
     /**
-     * Validate form fields using the new validation system
-     * I-validate ang form fields gamit ang bagong validation system
+     * Validate form fields using the validation system
+     * I-validate ang form fields gamit ang validation system
      */
     private fun validateForm(formState: EmergencyContactFormState): Boolean {
         var isValid = true
         var updatedFormState = formState
         
-        // Validate full name
-        val nameValidation = EmergencyContactValidation.validateFullName(formState.fullName)
-        if (!nameValidation.isValid) {
+        // Validate first name
+        if (formState.firstName.trim().isBlank()) {
             updatedFormState = updatedFormState.copy(
-                isFullNameError = true,
-                fullNameErrorMessage = nameValidation.errorMessage
+                isFirstNameError = true,
+                firstNameErrorMessage = "First name is required"
+            )
+            isValid = false
+        } else if (!com.brightcare.patient.ui.component.signup_component.ValidationUtils.isValidName(formState.firstName.trim())) {
+            updatedFormState = updatedFormState.copy(
+                isFirstNameError = true,
+                firstNameErrorMessage = "First name must be at least 2 characters and contain only letters"
+            )
+            isValid = false
+        }
+        
+        // Validate middle name (optional)
+        if (formState.middleName.trim().isNotBlank() && 
+            !com.brightcare.patient.ui.component.signup_component.ValidationUtils.isValidName(formState.middleName.trim())) {
+            updatedFormState = updatedFormState.copy(
+                isMiddleNameError = true,
+                middleNameErrorMessage = "Middle name must be at least 2 characters and contain only letters"
+            )
+            isValid = false
+        }
+        
+        // Validate last name
+        if (formState.lastName.trim().isBlank()) {
+            updatedFormState = updatedFormState.copy(
+                isLastNameError = true,
+                lastNameErrorMessage = "Last name is required"
+            )
+            isValid = false
+        } else if (!com.brightcare.patient.ui.component.signup_component.ValidationUtils.isValidName(formState.lastName.trim())) {
+            updatedFormState = updatedFormState.copy(
+                isLastNameError = true,
+                lastNameErrorMessage = "Last name must be at least 2 characters and contain only letters"
             )
             isValid = false
         }
         
         // Validate relationship
-        val relationshipValidation = EmergencyContactValidation.validateRelationship(
-            formState.relationship, 
-            formState.customRelationship
-        )
-        if (!relationshipValidation.isValid) {
+        if (formState.relationship.isBlank()) {
             updatedFormState = updatedFormState.copy(
                 isRelationshipError = true,
-                relationshipErrorMessage = relationshipValidation.errorMessage
+                relationshipErrorMessage = "Relationship is required"
+            )
+            isValid = false
+        } else if (formState.relationship == "Other" && formState.customRelationship.trim().isBlank()) {
+            updatedFormState = updatedFormState.copy(
+                isCustomRelationshipError = true,
+                customRelationshipErrorMessage = "Please specify the relationship"
             )
             isValid = false
         }
         
         // Validate phone number
-        val phoneValidation = EmergencyContactValidation.validatePhoneNumber(formState.phoneNumber)
-        if (!phoneValidation.isValid) {
+        if (formState.phoneNumber.isBlank()) {
             updatedFormState = updatedFormState.copy(
                 isPhoneNumberError = true,
-                phoneNumberErrorMessage = phoneValidation.errorMessage
+                phoneNumberErrorMessage = "Phone number is required"
+            )
+            isValid = false
+        } else if (!com.brightcare.patient.ui.component.signup_component.ValidationUtils.isValidPhoneNumber(formState.phoneNumber)) {
+            updatedFormState = updatedFormState.copy(
+                isPhoneNumberError = true,
+                phoneNumberErrorMessage = "Phone number must start with 09 and have 11 digits"
             )
             isValid = false
         }
         
-        // Validate email
-        val emailValidation = EmergencyContactValidation.validateEmail(formState.email)
-        if (!emailValidation.isValid) {
+        // Validate email (optional)
+        if (formState.email.trim().isNotBlank() && !android.util.Patterns.EMAIL_ADDRESS.matcher(formState.email.trim()).matches()) {
             updatedFormState = updatedFormState.copy(
                 isEmailError = true,
-                emailErrorMessage = emailValidation.errorMessage
+                emailErrorMessage = "Please enter a valid email address"
             )
             isValid = false
         }
         
-        // Validate address
-        val addressValidation = EmergencyContactValidation.validateAddress(formState.address)
-        if (!addressValidation.isValid) {
-            updatedFormState = updatedFormState.copy(
-                isAddressError = true,
-                addressErrorMessage = addressValidation.errorMessage
-            )
-            isValid = false
+        // Validate additional address (optional but if provided, must be valid - matching complete profile)
+        if (formState.additionalAddress.trim().isNotBlank()) {
+            if (!com.brightcare.patient.ui.component.signup_component.ValidationUtils.isValidAdditionalAddress(formState.additionalAddress.trim())) {
+                updatedFormState = updatedFormState.copy(
+                    isAdditionalAddressError = true,
+                    additionalAddressErrorMessage = "Additional address must be at least 3 characters long and may only contain letters, numbers, spaces, and basic punctuation (,.#'-/)."
+                )
+                isValid = false
+            }
         }
         
         // Update form state with validation results

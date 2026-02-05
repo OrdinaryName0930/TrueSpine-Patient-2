@@ -9,7 +9,12 @@ import com.brightcare.patient.data.repository.EmergencyContactRepository
 import com.brightcare.patient.data.repository.BookingRepository
 import com.brightcare.patient.data.repository.NotificationRepository
 import com.brightcare.patient.data.repository.ProfileValidationService
+import com.brightcare.patient.data.repository.ReviewRepository
 import com.brightcare.patient.data.service.EmailService
+import com.brightcare.patient.data.service.AppointmentStatusMonitor
+import com.brightcare.patient.data.service.LocalNotificationManager
+import com.brightcare.patient.data.service.NotificationServiceManager
+import com.brightcare.patient.data.service.SimpleAppointmentMonitor
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
@@ -163,9 +168,10 @@ object AppModule {
     fun provideBookingRepository(
         firebaseAuth: FirebaseAuth,
         firestore: FirebaseFirestore,
-        profileValidationService: ProfileValidationService
+        profileValidationService: ProfileValidationService,
+        notificationRepository: NotificationRepository
     ): BookingRepository {
-        return BookingRepository(firebaseAuth, firestore, profileValidationService)
+        return BookingRepository(firebaseAuth, firestore, profileValidationService, notificationRepository)
     }
     
     /**
@@ -178,6 +184,70 @@ object AppModule {
         firestore: FirebaseFirestore
     ): NotificationRepository {
         return NotificationRepository(firebaseAuth, firestore)
+    }
+    
+    /**
+     * Provides SimpleAppointmentMonitor instance
+     */
+    @Provides
+    @Singleton
+    fun provideSimpleAppointmentMonitor(
+        firebaseAuth: FirebaseAuth,
+        firestore: FirebaseFirestore,
+        notificationRepository: NotificationRepository
+    ): SimpleAppointmentMonitor {
+        return SimpleAppointmentMonitor(firebaseAuth, firestore, notificationRepository)
+    }
+    
+    /**
+     * Provides LocalNotificationManager instance
+     */
+    @Provides
+    @Singleton
+    fun provideLocalNotificationManager(
+        firebaseAuth: FirebaseAuth,
+        firestore: FirebaseFirestore
+    ): LocalNotificationManager {
+        return LocalNotificationManager(firebaseAuth, firestore)
+    }
+    
+    /**
+     * Provides AppointmentStatusMonitor instance
+     */
+    @Provides
+    @Singleton
+    fun provideAppointmentStatusMonitor(
+        firebaseAuth: FirebaseAuth,
+        firestore: FirebaseFirestore,
+        localNotificationManager: LocalNotificationManager
+    ): AppointmentStatusMonitor {
+        return AppointmentStatusMonitor(firebaseAuth, firestore, localNotificationManager)
+    }
+    
+    /**
+     * Provides NotificationServiceManager instance
+     */
+    @Provides
+    @Singleton
+    fun provideNotificationServiceManager(
+        firebaseAuth: FirebaseAuth,
+        appointmentStatusMonitor: AppointmentStatusMonitor,
+        simpleAppointmentMonitor: SimpleAppointmentMonitor
+    ): NotificationServiceManager {
+        return NotificationServiceManager(firebaseAuth, appointmentStatusMonitor, simpleAppointmentMonitor)
+    }
+    
+    /**
+     * Provides ReviewRepository instance
+     * Para sa paghawak ng mga review ng chiropractor
+     */
+    @Provides
+    @Singleton
+    fun provideReviewRepository(
+        firestore: FirebaseFirestore,
+        firebaseAuth: FirebaseAuth
+    ): ReviewRepository {
+        return ReviewRepository(firestore, firebaseAuth)
     }
 }
 

@@ -106,7 +106,7 @@ fun CompleteProfileTextField(
                 else Gray300,
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Gray50,
+                disabledContainerColor = Color.Transparent,
                 disabledBorderColor = Gray300,
                 errorBorderColor = MaterialTheme.colorScheme.error,
                 errorContainerColor = Color.Transparent,

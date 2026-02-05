@@ -24,6 +24,17 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.max
+import kotlin.math.min
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -41,7 +52,6 @@ import com.brightcare.patient.ui.showInfo
 import com.brightcare.patient.ui.showError
 import com.brightcare.patient.ui.screens.CompleteProfileFormState
 import com.brightcare.patient.ui.screens.AuthenticationViewModel
-import com.brightcare.patient.ui.component.navigation_fragment.NavigationItem
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -284,6 +294,9 @@ fun PersonalDetailsScreen(
     
     var showEditModal by remember { mutableStateOf(false) }
     var showEditIdModal by remember { mutableStateOf(false) }
+    var showImageViewer by remember { mutableStateOf(false) }
+    var selectedImageUrl by remember { mutableStateOf("") }
+    var selectedImageTitle by remember { mutableStateOf("") }
     
     // Pull-to-refresh state
     var isRefreshing by remember { mutableStateOf(false) }
@@ -336,27 +349,13 @@ fun PersonalDetailsScreen(
         return
     }
     
-    // Navigation items for the bottom navigation bar
-    val navigationItems = listOf(
-        NavigationItem.Home,
-        NavigationItem.Chiro,
-        NavigationItem.Appointment,
-        NavigationItem.Message,
-        NavigationItem.Profile
-    )
     
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(WhiteBg)
+            .pullRefresh(pullRefreshState)
     ) {
-        // Main content area
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .pullRefresh(pullRefreshState)
-        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -446,6 +445,11 @@ fun PersonalDetailsScreen(
             title = "Address Information",
             items = listOf(
                 PersonalInfoItem(
+                    "Country", 
+                    uiState.formState.country.ifBlank { "Philippines" }, 
+                    Icons.Default.Public
+                ),
+                PersonalInfoItem(
                     "Complete Address", 
                     formatCompleteAddress(
                         additionalAddress = uiState.formState.additionalAddress,
@@ -464,10 +468,20 @@ fun PersonalDetailsScreen(
         IdDocumentsSection(
             idFrontUrl = uiState.formState.idFrontImageUrl,
             idBackUrl = uiState.formState.idBackImageUrl,
-            onEditClick = { showEditIdModal = true }
+            onEditClick = { showEditIdModal = true },
+            onViewFrontImage = { url ->
+                selectedImageUrl = url
+                selectedImageTitle = "ID Front"
+                showImageViewer = true
+            },
+            onViewBackImage = { url ->
+                selectedImageUrl = url
+                selectedImageTitle = "ID Back"
+                showImageViewer = true
+            }
         )
         
-                Spacer(modifier = Modifier.height(80.dp)) // Bottom padding for navigation
+                Spacer(modifier = Modifier.height(32.dp)) // Bottom padding
             }
             
             // Pull refresh indicator
@@ -477,80 +491,6 @@ fun PersonalDetailsScreen(
                 modifier = Modifier.align(Alignment.TopCenter)
             )
         }
-        
-        // Bottom Navigation Bar
-        NavigationBar(
-            containerColor = White,
-            contentColor = Blue500,
-            tonalElevation = 40.dp,
-            windowInsets = WindowInsets(0.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(70.dp)
-        ) {
-            navigationItems.forEach { item ->
-                val isSelected = item.route == "profile" // Always show profile as selected
-                
-                NavigationBarItem(
-                    icon = {
-                        Icon(
-                            imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                            contentDescription = item.title,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = item.title,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                fontSize = 11.sp
-                            )
-                        )
-                    },
-                    selected = isSelected,
-                    onClick = {
-                        when (item.route) {
-                            "home" -> {
-                                navController.navigate("main_dashboard") {
-                                    popUpTo("personal_details") { inclusive = true }
-                                }
-                            }
-                            "chiro" -> {
-                                navController.navigate("main_dashboard") {
-                                    popUpTo("personal_details") { inclusive = true }
-                                }
-                            }
-                            "booking" -> {
-                                navController.navigate("main_dashboard") {
-                                    popUpTo("personal_details") { inclusive = true }
-                                }
-                            }
-                            "message" -> {
-                                navController.navigate("main_dashboard") {
-                                    popUpTo("personal_details") { inclusive = true }
-                                }
-                            }
-                            "profile" -> {
-                                // Navigate back to profile screen
-                                navController.navigate(NavigationRoutes.PROFILE) {
-                                    popUpTo(NavigationRoutes.PROFILE) { inclusive = false }
-                                }
-                            }
-                        }
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Blue500,
-                        selectedTextColor = Blue500,
-                        unselectedIconColor = Gray500,
-                        unselectedTextColor = Gray500,
-                        indicatorColor = Blue50
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
     
     
     // Edit Modal
@@ -576,6 +516,19 @@ fun PersonalDetailsScreen(
                 viewModel.updateProfile()
             },
             isLoading = uiState.isSaving
+        )
+    }
+    
+    // Image Viewer Dialog
+    if (showImageViewer && selectedImageUrl.isNotBlank()) {
+        ImageViewerDialog(
+            imageUrl = selectedImageUrl,
+            imageTitle = selectedImageTitle,
+            onDismiss = { 
+                showImageViewer = false
+                selectedImageUrl = ""
+                selectedImageTitle = ""
+            }
         )
     }
     
@@ -693,6 +646,8 @@ private fun IdDocumentsSection(
     idFrontUrl: String,
     idBackUrl: String,
     onEditClick: () -> Unit,
+    onViewFrontImage: (String) -> Unit = {},
+    onViewBackImage: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -782,16 +737,36 @@ private fun IdDocumentsSection(
                         Surface(
                             modifier = Modifier
                                 .size(100.dp, 70.dp)
-                                .clickable { /* TODO: Show full image */ },
+                                .clickable { onViewFrontImage(idFrontUrl) },
                             shape = RoundedCornerShape(8.dp),
                             color = Gray100
                         ) {
-                            AsyncImage(
-                                model = idFrontUrl,
-                                contentDescription = "ID Front",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
-                            )
+                            Box {
+                                AsyncImage(
+                                    model = idFrontUrl,
+                                    contentDescription = "ID Front",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit
+                                )
+                                // Overlay to indicate clickable
+                                Surface(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(4.dp)
+                                        .size(20.dp),
+                                    shape = CircleShape,
+                                    color = Blue500.copy(alpha = 0.8f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Visibility,
+                                        contentDescription = "View Image",
+                                        tint = White,
+                                        modifier = Modifier
+                                            .padding(2.dp)
+                                            .size(16.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -852,16 +827,36 @@ private fun IdDocumentsSection(
                         Surface(
                             modifier = Modifier
                                 .size(100.dp, 70.dp)
-                                .clickable { /* TODO: Show full image */ },
+                                .clickable { onViewBackImage(idBackUrl) },
                             shape = RoundedCornerShape(8.dp),
                             color = Gray100
                         ) {
-                            AsyncImage(
-                                model = idBackUrl,
-                                contentDescription = "ID Back",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
-                            )
+                            Box {
+                                AsyncImage(
+                                    model = idBackUrl,
+                                    contentDescription = "ID Back",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit
+                                )
+                                // Overlay to indicate clickable
+                                Surface(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(4.dp)
+                                        .size(20.dp),
+                                    shape = CircleShape,
+                                    color = Blue500.copy(alpha = 0.8f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Visibility,
+                                        contentDescription = "View Image",
+                                        tint = White,
+                                        modifier = Modifier
+                                            .padding(2.dp)
+                                            .size(16.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -966,7 +961,7 @@ private fun EditProfileModal(
     val validateAdditionalAddress = {
         if (editedFormState.additionalAddress.trim().isNotBlank()) {
             if (!ValidationUtils.isValidAdditionalAddress(editedFormState.additionalAddress.trim())) {
-                additionalAddressError = "Additional address must be at least 3 characters long and may only contain letters (including ñ), numbers, spaces, and basic punctuation (,.#'-/)."
+                additionalAddressError = "Additional address must be at least 3 characters long and may only contain letters, numbers, spaces, and basic punctuation (,.#'-/)."
                 false
             } else {
                 additionalAddressError = ""
@@ -1150,6 +1145,14 @@ private fun EditProfileModal(
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
                     
+                    // Country field (read-only, default Philippines)
+                    CompleteProfileTextField(
+                        value = "Philippines",
+                        onValueChange = { }, // No-op since it's read-only
+                        placeholder = "Country",
+                        enabled = false
+                    )
+                    
                     addressData?.let { data ->
                         // Province dropdown with formatted options
                         val provinces = data.provinces.map { it.toDisplayName() }
@@ -1216,7 +1219,7 @@ private fun EditProfileModal(
                             editedFormState = editedFormState.copy(additionalAddress = formattedValue)
                             validateAdditionalAddress()
                         },
-                        placeholder = "Additional Address (Street, Building, etc.)",
+                        placeholder = "Additional Address",
                         singleLine = false,
                         isError = additionalAddressError.isNotEmpty(),
                         errorMessage = additionalAddressError
@@ -1331,16 +1334,6 @@ private fun EditIdDocumentsModal(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Instructions
-                Text(
-                    text = "Please upload clear photos of both sides of your valid ID. Make sure all text is readable and the images are well-lit.",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Gray600,
-                        lineHeight = 20.sp
-                    ),
-                    modifier = Modifier.padding(bottom = 24.dp)
-                )
-                
                 // ID Upload Component
                 Column(
                     modifier = Modifier
@@ -1409,6 +1402,151 @@ private fun EditIdDocumentsModal(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageViewerDialog(
+    imageUrl: String,
+    imageTitle: String,
+    onDismiss: () -> Unit
+) {
+    // State for zoom and pan
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    
+    // Maximum zoom level (3x like Facebook Messenger)
+    val maxScale = 3f
+    val minScale = 1f
+    
+    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
+        val newScale = (scale * zoomChange).coerceIn(minScale, maxScale)
+        
+        // Only allow panning when zoomed in
+        val newOffset = if (newScale > minScale) {
+            // Limit pan to reasonable bounds when zoomed
+            val maxOffsetX = (newScale - 1f) * 200f
+            val maxOffsetY = (newScale - 1f) * 200f
+            
+            Offset(
+                x = (offset.x + offsetChange.x).coerceIn(-maxOffsetX, maxOffsetX),
+                y = (offset.y + offsetChange.y).coerceIn(-maxOffsetY, maxOffsetY)
+            )
+        } else {
+            // Reset offset when zoomed out to original size
+            Offset.Zero
+        }
+        
+        scale = newScale
+        offset = newOffset
+    }
+    
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(WhiteBg)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header with title and close button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = imageTitle,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Gray800
+                        )
+                    )
+                    
+                    IconButton(
+                        onClick = onDismiss,
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = Gray100
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Gray800
+                        )
+                    }
+                }
+                
+                // Image container with zoom functionality
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = imageTitle,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 200.dp, max = 600.dp)
+                                .graphicsLayer(
+                                    scaleX = scale,
+                                    scaleY = scale,
+                                    translationX = offset.x,
+                                    translationY = offset.y
+                                )
+                                .transformable(state = transformableState)
+                                .pointerInput(Unit) {
+                                    // Double tap to zoom in/out like Facebook Messenger
+                                    detectTapGestures(
+                                        onDoubleTap = { tapOffset ->
+                                            if (scale > minScale) {
+                                                // If zoomed in, zoom out to original size
+                                                scale = minScale
+                                                offset = Offset.Zero
+                                            } else {
+                                                // If at original size, zoom in to 2x at tap location
+                                                scale = 2f
+                                                // Calculate offset to center on tap location
+                                                val centerX = size.width / 2f
+                                                val centerY = size.height / 2f
+                                                offset = Offset(
+                                                    x = (centerX - tapOffset.x) * 0.5f,
+                                                    y = (centerY - tapOffset.y) * 0.5f
+                                                )
+                                            }
+                                        }
+                                    )
+                                },
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                }
+                
             }
         }
     }

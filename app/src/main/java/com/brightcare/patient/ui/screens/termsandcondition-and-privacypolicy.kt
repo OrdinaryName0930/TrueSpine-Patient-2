@@ -23,6 +23,7 @@ import com.brightcare.patient.ui.component.termsandconditions_and_privacypolicy.
 import com.brightcare.patient.ui.component.termsandconditions_and_privacypolicy.TermsBackButton
 import com.brightcare.patient.ui.component.termsandconditions_and_privacypolicy.TermsContent
 import com.brightcare.patient.ui.theme.*
+import com.brightcare.patient.navigation.NavigationRoutes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,7 +162,7 @@ fun TermsAndConditionsScreen(
                             
                             // Check if we came from Complete Profile
                             val previousRoute = navController.previousBackStackEntry?.destination?.route
-                            if (previousRoute == "complete_profile") {
+                            if (previousRoute == NavigationRoutes.COMPLETE_PROFILE) {
                                 // Set terms agreed for Complete Profile
                                 navController.previousBackStackEntry
                                     ?.savedStateHandle

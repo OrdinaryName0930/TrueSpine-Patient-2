@@ -26,6 +26,7 @@ fun ChiropractorCard(
     chiropractor: ChiropractorInfo,
     onBookClick: () -> Unit,
     onViewProfileClick: () -> Unit,
+    onMessageClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -111,7 +112,8 @@ fun ChiropractorCard(
             ChiropractorCardActions(
                 isAvailable = chiropractor.isAvailable,
                 onBookClick = onBookClick,
-                onViewProfileClick = onViewProfileClick
+                onViewProfileClick = onViewProfileClick,
+                onMessageClick = onMessageClick
             )
         }
     }
@@ -160,29 +162,52 @@ private fun ChiropractorCardActions(
     isAvailable: Boolean,
     onBookClick: () -> Unit,
     onViewProfileClick: () -> Unit,
+    onMessageClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    Column(
+        modifier = modifier.fillMaxWidth()
     ) {
-        OutlinedButton(
-            onClick = onViewProfileClick,
-            modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = Blue500
-            ),
-            border = BorderStroke(
-                width = 1.dp,
-                color = Blue500
-            )
+        // First Row: View Profile and Message buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("View Profile")
+            OutlinedButton(
+                onClick = onViewProfileClick,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Blue500
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = Blue500
+                )
+            ) {
+                Text("View Profile")
+            }
+            
+            OutlinedButton(
+                onClick = onMessageClick,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Blue500
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = Blue500
+                )
+            ) {
+                Text("Message")
+            }
         }
         
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Second Row: Book Now button (full width)
         Button(
             onClick = onBookClick,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             enabled = isAvailable,
             colors = ButtonDefaults.buttonColors(
                 containerColor = Blue500,
@@ -211,7 +236,8 @@ fun ChiropractorCardPreview() {
                 isAvailable = true
             ),
             onBookClick = { },
-            onViewProfileClick = { }
+            onViewProfileClick = { },
+            onMessageClick = { }
         )
     }
 }

@@ -7,4 +7,7 @@
     <string name="facebook_app_id">2816129565446988</string>
     <string name="facebook_client_token">aec4bc46e82c7da4ed7cb9a90e722b8f</string>
     <string name="fb_login_protocol_scheme">fb2816129565446988</string>
+    
+    <!-- Notification Configuration -->
+    <string name="default_notification_channel_id">brightcare_notifications</string>
 </resources>

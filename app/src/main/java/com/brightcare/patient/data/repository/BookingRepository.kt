@@ -19,7 +19,8 @@ import javax.inject.Singleton
 class BookingRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
-    private val profileValidationService: ProfileValidationService
+    private val profileValidationService: ProfileValidationService,
+    private val notificationRepository: NotificationRepository
 ) {
     
     companion object {
@@ -40,7 +41,9 @@ class BookingRepository @Inject constructor(
         appointmentType: AppointmentType,
         symptoms: String,
         notes: String,
-        isFirstVisit: Boolean
+        isFirstVisit: Boolean,
+        paymentOption: String = "",
+        paymentProofUri: String = ""
     ): Result<String> {
         return try {
             val currentUser = firebaseAuth.currentUser
@@ -98,7 +101,7 @@ class BookingRepository @Inject constructor(
                 "General Practice"
             }
             
-            // Create appointment with new format including chiropractor info
+            // Create appointment with new format including chiropractor info and payment data
             val appointment = Appointment(
                 id = appointmentId,
                 chiroId = chiropractorId,
@@ -110,6 +113,9 @@ class BookingRepository @Inject constructor(
                 createdAt = System.currentTimeMillis() / 1000, // Unix timestamp in seconds
                 whoBooked = "client",
                 bookedByUid = currentUser.uid,
+                paymentOption = paymentOption,
+                paymentProofUri = paymentProofUri,
+                lastUpdated = System.currentTimeMillis() / 1000,
                 chiropractorName = chiropractorName,
                 chiropractorSpecialization = chiropractorSpecialization
             )
@@ -119,6 +125,28 @@ class BookingRepository @Inject constructor(
                 .document(appointmentId)
                 .set(appointment.toMap())
                 .await()
+            
+            // Create notification for new booking using existing NotificationRepository
+            try {
+                Log.d(TAG, "Creating notification for new booking...")
+                val result = notificationRepository.createNotification(
+                    title = "New Appointment Booked 📅",
+                    message = "Your appointment with $chiropractorName on $formattedDate at $appointmentTime has been submitted and is pending approval.",
+                    type = NotificationType.NEW_BOOKING,
+                    appointmentId = appointmentId
+                )
+                result.fold(
+                    onSuccess = { notificationId ->
+                        Log.d(TAG, "Notification created successfully: $notificationId")
+                    },
+                    onFailure = { exception ->
+                        Log.e(TAG, "Failed to create notification: ${exception.message}")
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception creating notification: ${e.message}", e)
+                // Don't fail the booking if notification fails
+            }
             
             Log.d(TAG, "Appointment booked successfully: $appointmentId")
             Result.success(appointmentId)
@@ -262,45 +290,21 @@ class BookingRepository @Inject constructor(
         return try {
             Log.d(TAG, "Fetching available time slots for chiropractor: $chiropractorId on date: $date")
             
-            // Get existing appointments for this chiropractor on this date
-            val startOfDay = Calendar.getInstance().apply {
-                time = date
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }.time
-            
-            val endOfDay = Calendar.getInstance().apply {
-                time = date
-                set(Calendar.HOUR_OF_DAY, 23)
-                set(Calendar.MINUTE, 59)
-                set(Calendar.SECOND, 59)
-                set(Calendar.MILLISECOND, 999)
-            }.time
-            
-            // Format date for query (YYYY-MM-DD)
-            val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val formattedDate = dateFormat.format(date)
-            
-            val existingAppointments = firestore.collection(COLLECTION_APPOINTMENTS)
-                .whereEqualTo("chiroId", chiropractorId)
-                .whereEqualTo("date", formattedDate)
-                .whereIn("status", listOf("pending", "approved", "booked"))
-                .get()
-                .await()
-            
-            val bookedTimes = existingAppointments.documents.mapNotNull { doc ->
-                val time24Hour = doc.getString("time")
-                // Convert back to 12-hour format for comparison
-                time24Hour?.let { convertFrom24HourFormat(it) }
-            }.toSet()
+            // Get booked times for this chiropractor on this date
+            val bookedTimesResult = getBookedTimesForDoctorAndDate(chiropractorId, date)
+            val bookedTimes = bookedTimesResult.getOrElse { 
+                Log.w(TAG, "Failed to get booked times, proceeding with empty set")
+                emptySet()
+            }
             
             // Generate default time slots (10 AM to 7 PM, 30-minute intervals)
             val timeSlots = generateDefaultTimeSlots().map { timeSlot ->
+                val isBooked = bookedTimes.contains(timeSlot.time)
+                val isPastTime = isTimeSlotInPast(timeSlot.time, date)
+                
                 timeSlot.copy(
-                    isAvailable = !bookedTimes.contains(timeSlot.time),
-                    isBooked = bookedTimes.contains(timeSlot.time)
+                    isAvailable = !isBooked && !isPastTime,
+                    isBooked = isBooked
                 )
             }
             
@@ -341,6 +345,115 @@ class BookingRepository @Inject constructor(
         }
         
         return timeSlots
+    }
+    
+    /**
+     * Get user's booked dates to prevent double booking
+     * Kunin ang mga booked dates ng user para maiwasan ang double booking
+     */
+    suspend fun getUserBookedDates(): Result<Set<String>> {
+        return try {
+            val currentUser = firebaseAuth.currentUser
+            if (currentUser == null) {
+                Log.e(TAG, "No authenticated user found")
+                return Result.failure(Exception("User must be logged in"))
+            }
+            
+            Log.d(TAG, "Fetching booked dates for user: ${currentUser.uid}")
+            
+            val querySnapshot = firestore.collection(COLLECTION_APPOINTMENTS)
+                .whereEqualTo("clientId", currentUser.uid)
+                .whereIn("status", listOf("pending", "approved", "booked", "confirmed"))
+                .get()
+                .await()
+            
+            val bookedDates = querySnapshot.documents.mapNotNull { document ->
+                try {
+                    document.getString("date")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error parsing appointment date: ${document.id}", e)
+                    null
+                }
+            }.toSet()
+            
+            Log.d(TAG, "Found ${bookedDates.size} booked dates for user")
+            Result.success(bookedDates)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching user booked dates", e)
+            Result.failure(Exception("Failed to fetch booked dates: ${e.message}"))
+        }
+    }
+    
+    /**
+     * Get unique patient count for a specific chiropractor
+     * Kunin ang bilang ng mga unique patients para sa specific chiropractor
+     */
+    suspend fun getPatientCountForChiropractor(chiropractorId: String): Result<Int> {
+        return try {
+            Log.d(TAG, "Fetching patient count for chiropractor: $chiropractorId")
+            
+            val querySnapshot = firestore.collection(COLLECTION_APPOINTMENTS)
+                .whereEqualTo("chiroId", chiropractorId)
+                .get()
+                .await()
+            
+            val uniqueClientIds = querySnapshot.documents.mapNotNull { document ->
+                try {
+                    document.getString("clientId")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error parsing clientId from appointment: ${document.id}", e)
+                    null
+                }
+            }.toSet()
+            
+            val patientCount = uniqueClientIds.size
+            Log.d(TAG, "Found $patientCount unique patients for chiropractor: $chiropractorId")
+            Result.success(patientCount)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching patient count for chiropractor", e)
+            Result.failure(Exception("Failed to fetch patient count: ${e.message}"))
+        }
+    }
+    
+    /**
+     * Get booked times for a specific doctor on a specific date
+     * Kunin ang mga booked times para sa specific doctor sa specific date
+     */
+    suspend fun getBookedTimesForDoctorAndDate(chiropractorId: String, date: Date): Result<Set<String>> {
+        return try {
+            Log.d(TAG, "Fetching booked times for chiropractor: $chiropractorId on date: $date")
+            
+            // Format date for query (YYYY-MM-DD)
+            val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val formattedDate = dateFormat.format(date)
+            
+            val querySnapshot = firestore.collection(COLLECTION_APPOINTMENTS)
+                .whereEqualTo("chiroId", chiropractorId)
+                .whereEqualTo("date", formattedDate)
+                .whereIn("status", listOf("pending", "approved", "booked", "confirmed"))
+                .get()
+                .await()
+            
+            val bookedTimes = querySnapshot.documents.mapNotNull { document ->
+                try {
+                    val time24Hour = document.getString("time")
+                    // Convert from 24-hour format to 12-hour format for comparison with UI
+                    time24Hour?.let { convertFrom24HourFormat(it) }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error parsing appointment time: ${document.id}", e)
+                    null
+                }
+            }.toSet()
+            
+            Log.d(TAG, "Found ${bookedTimes.size} booked times for chiropractor $chiropractorId on $formattedDate: $bookedTimes")
+            Result.success(bookedTimes)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching booked times for doctor", e)
+            Result.failure(Exception("Failed to fetch booked times: ${e.message}"))
+        }
     }
     
     /**
@@ -447,6 +560,60 @@ class BookingRepository @Inject constructor(
             Log.e(TAG, "Error converting time format: $time12Hour", e)
             time12Hour
         }
+    }
+    
+    /**
+     * Check if a time slot is in the past for the given date
+     * I-check kung nakaraan na ang time slot para sa given date
+     */
+    private fun isTimeSlotInPast(timeSlot: String, selectedDate: Date): Boolean {
+        return try {
+            val currentDate = Calendar.getInstance()
+            val selectedCalendar = Calendar.getInstance().apply { time = selectedDate }
+            
+            // Only filter past times if the selected date is today
+            if (!isSameDay(currentDate, selectedCalendar)) {
+                return false
+            }
+            
+            // Convert time slot to 24-hour format for comparison
+            val time24Hour = convertTo24HourFormat(timeSlot)
+            val timeParts = time24Hour.split(":")
+            if (timeParts.size != 2) return false
+            
+            val slotHour = timeParts[0].toInt()
+            val slotMinute = timeParts[1].toInt()
+            
+            // Create calendar for the time slot
+            val slotCalendar = Calendar.getInstance().apply {
+                time = selectedDate
+                set(Calendar.HOUR_OF_DAY, slotHour)
+                set(Calendar.MINUTE, slotMinute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            
+            // Check if the slot time has passed
+            val isPast = slotCalendar.before(currentDate)
+            
+            if (isPast) {
+                Log.d(TAG, "Time slot $timeSlot is in the past for today")
+            }
+            
+            isPast
+        } catch (e: Exception) {
+            Log.w(TAG, "Error checking if time slot is in past: $timeSlot", e)
+            false // If error occurs, don't filter the slot
+        }
+    }
+    
+    /**
+     * Check if two calendars represent the same day
+     * I-check kung pareho ang araw ng dalawang calendar
+     */
+    private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
+        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+               cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
     }
 
     /**

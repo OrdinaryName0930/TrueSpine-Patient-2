@@ -161,7 +161,8 @@ class ChiropractorRepository @Inject constructor() {
     
     /**
      * Map ChiropractorModel from Firestore to ChiropractorInfo for UI
-     * Includes dummy data generation for missing fields
+     * Uses real rating and reviewCount data from Firestore
+     * Ginagamit ang totoong rating at reviewCount data mula sa Firestore
      */
     private fun mapToChiropractorInfo(documentId: String, model: ChiropractorModel): ChiropractorInfo {
         return ChiropractorInfo(
@@ -169,7 +170,7 @@ class ChiropractorRepository @Inject constructor() {
             name = model.name,
             specialization = model.specialization,
             experience = "${model.yearsOfExperience} years",
-            rating = model.generateDummyRating(),
+            rating = model.getRealRating(), // Use real rating from reviews
             location = model.generateDummyLocation(),
             isAvailable = model.generateAvailabilityStatus(),
             yearsOfExperience = model.yearsOfExperience,
@@ -177,7 +178,7 @@ class ChiropractorRepository @Inject constructor() {
             email = model.email,
             profileImageUrl = model.profileImageUrl,
             role = model.role,
-            reviewCount = model.generateDummyReviewCount()
+            reviewCount = model.getRealReviewCount() // Use real review count
         )
     }
 }

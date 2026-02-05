@@ -364,7 +364,7 @@ class CompleteProfileViewModel @Inject constructor(
         }
         
         val errorMessage = if (!isValid) {
-            "Please enter a valid Philippine phone number (e.g., 09123456789 or +639123456789)"
+            "Please enter a valid phone number starting with 09 and containing exactly 11 digits"
         } else ""
         
         updateFormState { currentState ->
@@ -579,7 +579,7 @@ class CompleteProfileViewModel @Inject constructor(
                     isUploadingImages = false,
                     isSuccess = false,
                     uploadProgress = 0f,
-                    errorMessage = "An unexpected error occurred while uploading profile picture. Please try again. / May naganap na hindi inaasahang error sa pag-upload ng profile picture. Pakisubukan ulit."
+                    errorMessage = "An unexpected error occurred while uploading profile picture. Please try again."
                 )
             }
         }
@@ -622,18 +622,18 @@ class CompleteProfileViewModel @Inject constructor(
     private fun getErrorMessage(exception: Throwable): String {
         return when {
             exception.message?.contains("network", ignoreCase = true) == true -> 
-                "Network error. Please check your internet connection and try again. / May problema sa network. Pakisuri ang inyong internet connection at subukan ulit."
+                "Network error. Please check your internet connection and try again."
             exception.message?.contains("permission", ignoreCase = true) == true -> 
-                "Permission denied. Please try logging in again. / Walang pahintulot. Pakisubukan ang pag-login ulit."
+                "Permission denied. Please try logging in again."
             exception.message?.contains("not authenticated", ignoreCase = true) == true -> 
-                "Session expired. Please log in again. / Nag-expire na ang session. Pakisubukan ang pag-login ulit."
+                "Session expired. Please log in again."
             exception.message?.contains("upload", ignoreCase = true) == true -> 
-                "Failed to upload images. Please check your internet connection and try again. / Hindi nai-upload ang mga larawan. Pakisuri ang internet connection at subukan ulit."
+                "Failed to upload images. Please check your internet connection and try again."
             exception.message?.contains("storage", ignoreCase = true) == true -> 
-                "Storage error occurred. Please try again later. / May problema sa storage. Pakisubukan ulit mamaya."
+                "Storage error occurred. Please try again later."
             exception.message?.contains("validation", ignoreCase = true) == true -> 
-                "Please check all required fields and try again. / Pakisuri ang lahat ng required fields at subukan ulit."
-            else -> "Failed to save profile. Please try again. / Hindi na-save ang profile. Pakisubukan ulit."
+                "Please check all required fields and try again."
+            else -> "Failed to save profile. Please try again."
         }
     }
 }

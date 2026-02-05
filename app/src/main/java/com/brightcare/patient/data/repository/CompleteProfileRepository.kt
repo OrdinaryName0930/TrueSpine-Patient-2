@@ -8,7 +8,11 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.storage.FirebaseStorage
 import com.brightcare.patient.ui.screens.CompleteProfileFormState
+import com.brightcare.patient.utils.ImageCompressionUtils
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,8 +37,8 @@ class CompleteProfileRepository @Inject constructor(
     }
     
     /**
-     * Upload ID image to Firebase Storage
-     * I-upload ang ID image sa Firebase Storage
+     * Upload ID image to Firebase Storage with compression
+     * I-upload ang ID image sa Firebase Storage na may compression
      */
     private suspend fun uploadIdImage(imageUri: String, userId: String, imageType: String): Result<String> {
         return try {
@@ -42,19 +46,66 @@ class CompleteProfileRepository @Inject constructor(
                 return Result.failure(Exception("Image URI is empty"))
             }
             
-            val uri = Uri.parse(imageUri)
+            Log.d(TAG, "Starting $imageType image upload with compression for user: $userId")
+            
+            // Compress image first for faster upload and storage efficiency
+            // I-compress muna ang image para sa mas mabilis na upload at storage efficiency
+            val compressionResult = withContext(Dispatchers.IO) {
+                ImageCompressionUtils.compressIdImage(
+                    context = context,
+                    imageUri = Uri.parse(imageUri),
+                    isIdDocument = true // Use high quality settings for ID documents
+                )
+            }
+            
+            if (compressionResult.isFailure) {
+                Log.e(TAG, "Failed to compress $imageType image: ${compressionResult.exceptionOrNull()?.message}")
+                return Result.failure(Exception("Failed to compress $imageType image: ${compressionResult.exceptionOrNull()?.message}"))
+            }
+            
+            val compressedImagePath = compressionResult.getOrNull()!!
+            val compressedFile = File(compressedImagePath)
+            val compressedUri = Uri.fromFile(compressedFile)
+            
+            // Log compression results
+            val originalSize = try {
+                context.contentResolver.openInputStream(Uri.parse(imageUri))?.use { it.available() } ?: 0
+            } catch (e: Exception) { 0 }
+            val compressedSize = compressedFile.length()
+            val compressionRatio = if (originalSize > 0) {
+                ((originalSize - compressedSize).toFloat() / originalSize * 100).toInt()
+            } else 0
+            
+            Log.d(TAG, "$imageType image compression completed:")
+            Log.d(TAG, "  Original size: ${originalSize / 1024}KB")
+            Log.d(TAG, "  Compressed size: ${compressedSize / 1024}KB")
+            Log.d(TAG, "  Compression ratio: $compressionRatio%")
+            
+            // Upload compressed image to Firebase Storage
             val fileName = "${userId}_${imageType}_${System.currentTimeMillis()}.jpg"
             val storageRef = firebaseStorage.reference
                 .child(STORAGE_PATH_ID_IMAGES)
                 .child(userId)
                 .child(fileName)
             
-            Log.d(TAG, "Uploading $imageType image for user: $userId")
+            Log.d(TAG, "Uploading compressed $imageType image to Firebase Storage...")
             
-            val uploadTask = storageRef.putFile(uri).await()
+            val uploadTask = storageRef.putFile(compressedUri).await()
             val downloadUrl = uploadTask.storage.downloadUrl.await()
             
+            // Clean up compressed file after upload
+            withContext(Dispatchers.IO) {
+                try {
+                    compressedFile.delete()
+                    Log.d(TAG, "Cleaned up temporary compressed file")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not delete temporary compressed file", e)
+                }
+            }
+            
             Log.d(TAG, "$imageType image uploaded successfully. URL: $downloadUrl")
+            Log.d(TAG, "Upload completed with ${compressionRatio}% size reduction")
+            
             Result.success(downloadUrl.toString())
             
         } catch (e: Exception) {
@@ -77,6 +128,18 @@ class CompleteProfileRepository @Inject constructor(
             }
             
             Log.d(TAG, "Saving profile for authenticated user: ${currentUser.uid}")
+            
+            // Upload profile picture if provided
+            var profilePictureUrl = formState.profilePictureUrl
+            
+            if (formState.profilePictureUri.isNotBlank() && formState.profilePictureUri != formState.profilePictureUrl) {
+                Log.d(TAG, "Uploading profile picture with compression...")
+                val profileUploadResult = uploadProfilePictureInternal(formState.profilePictureUri, currentUser.uid)
+                if (profileUploadResult.isFailure) {
+                    return profileUploadResult.map { }
+                }
+                profilePictureUrl = profileUploadResult.getOrNull() ?: ""
+            }
             
             // Upload ID images if provided
             var idFrontUrl = formState.idFrontImageUrl
@@ -101,6 +164,7 @@ class CompleteProfileRepository @Inject constructor(
             // Prepare the profile data including terms and privacy policy and ID images
             val profileData = hashMapOf(
                 "firstName" to formState.firstName.trim(),
+                "middleName" to formState.middleName.trim(),
                 "lastName" to formState.lastName.trim(),
                 "suffix" to formState.suffix.trim(),
                 "birthDate" to formState.birthDate.trim(),
@@ -111,6 +175,7 @@ class CompleteProfileRepository @Inject constructor(
                 "municipality" to formState.municipality,
                 "barangay" to formState.barangay,
                 "additionalAddress" to formState.additionalAddress.trim(),
+                "profilePictureUrl" to profilePictureUrl,
                 "idFrontImageUrl" to idFrontUrl,
                 "idBackImageUrl" to idBackUrl,
                 "agreedToTerms" to formState.agreedToTerms,
@@ -236,6 +301,7 @@ class CompleteProfileRepository @Inject constructor(
             // Convert Firestore document to CompleteProfileFormState
             val formState = CompleteProfileFormState(
                 firstName = document.getString("firstName") ?: "",
+                middleName = document.getString("middleName") ?: "",
                 lastName = document.getString("lastName") ?: "",
                 suffix = document.getString("suffix") ?: "",
                 birthDate = document.getString("birthDate") ?: "",
@@ -246,6 +312,7 @@ class CompleteProfileRepository @Inject constructor(
                 municipality = document.getString("municipality") ?: "",
                 barangay = document.getString("barangay") ?: "",
                 additionalAddress = document.getString("additionalAddress") ?: "",
+                profilePictureUri = document.getString("profilePictureUrl") ?: "", // Set URI to URL for display
                 profilePictureUrl = document.getString("profilePictureUrl") ?: "",
                 idFrontImageUrl = document.getString("idFrontImageUrl") ?: "",
                 idBackImageUrl = document.getString("idBackImageUrl") ?: "",
@@ -278,8 +345,86 @@ class CompleteProfileRepository @Inject constructor(
     }
     
     /**
-     * Upload profile picture to Firebase Storage
-     * I-upload ang profile picture sa Firebase Storage
+     * Internal method to upload profile picture without updating Firestore
+     * Internal na method para sa pag-upload ng profile picture nang hindi nag-update ng Firestore
+     */
+    private suspend fun uploadProfilePictureInternal(imageUri: String, userId: String): Result<String> {
+        return try {
+            if (imageUri.isBlank()) {
+                return Result.failure(Exception("Image URI is empty"))
+            }
+            
+            Log.d(TAG, "Starting profile picture upload with compression for user: $userId")
+            
+            // Compress image for faster upload
+            // I-compress ang image para sa mas mabilis na upload
+            val compressionResult = withContext(Dispatchers.IO) {
+                ImageCompressionUtils.compressIdImage(
+                    context = context,
+                    imageUri = Uri.parse(imageUri),
+                    isIdDocument = false // Use medium quality for profile pictures
+                )
+            }
+            
+            if (compressionResult.isFailure) {
+                Log.e(TAG, "Failed to compress profile picture: ${compressionResult.exceptionOrNull()?.message}")
+                return Result.failure(Exception("Failed to compress profile picture: ${compressionResult.exceptionOrNull()?.message}"))
+            }
+            
+            val compressedImagePath = compressionResult.getOrNull()!!
+            val compressedFile = File(compressedImagePath)
+            val compressedUri = Uri.fromFile(compressedFile)
+            
+            // Log compression results
+            val originalSize = try {
+                context.contentResolver.openInputStream(Uri.parse(imageUri))?.use { it.available() } ?: 0
+            } catch (e: Exception) { 0 }
+            val compressedSize = compressedFile.length()
+            val compressionRatio = if (originalSize > 0) {
+                ((originalSize - compressedSize).toFloat() / originalSize * 100).toInt()
+            } else 0
+            
+            Log.d(TAG, "Profile picture compression completed:")
+            Log.d(TAG, "  Original size: ${originalSize / 1024}KB")
+            Log.d(TAG, "  Compressed size: ${compressedSize / 1024}KB")
+            Log.d(TAG, "  Compression ratio: $compressionRatio%")
+            
+            // Upload compressed image
+            val fileName = "profile_${userId}_${System.currentTimeMillis()}.jpg"
+            val storageRef = firebaseStorage.reference
+                .child("profile_pictures")
+                .child(userId)
+                .child(fileName)
+            
+            Log.d(TAG, "Uploading compressed profile picture to Firebase Storage...")
+            
+            val uploadTask = storageRef.putFile(compressedUri).await()
+            val downloadUrl = uploadTask.storage.downloadUrl.await()
+            
+            // Clean up compressed file after upload
+            withContext(Dispatchers.IO) {
+                try {
+                    compressedFile.delete()
+                    Log.d(TAG, "Cleaned up temporary compressed file")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not delete temporary compressed file", e)
+                }
+            }
+            
+            Log.d(TAG, "Profile picture uploaded successfully. URL: $downloadUrl")
+            Log.d(TAG, "Upload completed with ${compressionRatio}% size reduction")
+            
+            Result.success(downloadUrl.toString())
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error uploading profile picture", e)
+            Result.failure(Exception("Failed to upload profile picture: ${e.message}"))
+        }
+    }
+    
+    /**
+     * Upload profile picture to Firebase Storage with compression
+     * I-upload ang profile picture sa Firebase Storage na may compression
      */
     suspend fun uploadProfilePicture(imageUri: String): Result<String> {
         return try {
@@ -293,19 +438,65 @@ class CompleteProfileRepository @Inject constructor(
                 return Result.failure(Exception("Image URI is empty"))
             }
             
-            val uri = Uri.parse(imageUri)
+            Log.d(TAG, "Starting profile picture upload with compression for user: ${currentUser.uid}")
+            
+            // Compress image for faster upload
+            // I-compress ang image para sa mas mabilis na upload
+            val compressionResult = withContext(Dispatchers.IO) {
+                ImageCompressionUtils.compressIdImage(
+                    context = context,
+                    imageUri = Uri.parse(imageUri),
+                    isIdDocument = false // Use medium quality for profile pictures
+                )
+            }
+            
+            if (compressionResult.isFailure) {
+                Log.e(TAG, "Failed to compress profile picture: ${compressionResult.exceptionOrNull()?.message}")
+                return Result.failure(Exception("Failed to compress profile picture: ${compressionResult.exceptionOrNull()?.message}"))
+            }
+            
+            val compressedImagePath = compressionResult.getOrNull()!!
+            val compressedFile = File(compressedImagePath)
+            val compressedUri = Uri.fromFile(compressedFile)
+            
+            // Log compression results
+            val originalSize = try {
+                context.contentResolver.openInputStream(Uri.parse(imageUri))?.use { it.available() } ?: 0
+            } catch (e: Exception) { 0 }
+            val compressedSize = compressedFile.length()
+            val compressionRatio = if (originalSize > 0) {
+                ((originalSize - compressedSize).toFloat() / originalSize * 100).toInt()
+            } else 0
+            
+            Log.d(TAG, "Profile picture compression completed:")
+            Log.d(TAG, "  Original size: ${originalSize / 1024}KB")
+            Log.d(TAG, "  Compressed size: ${compressedSize / 1024}KB")
+            Log.d(TAG, "  Compression ratio: $compressionRatio%")
+            
+            // Upload compressed image
             val fileName = "profile_${currentUser.uid}_${System.currentTimeMillis()}.jpg"
             val storageRef = firebaseStorage.reference
                 .child("profile_pictures")
                 .child(currentUser.uid)
                 .child(fileName)
             
-            Log.d(TAG, "Uploading profile picture for user: ${currentUser.uid}")
+            Log.d(TAG, "Uploading compressed profile picture to Firebase Storage...")
             
-            val uploadTask = storageRef.putFile(uri).await()
+            val uploadTask = storageRef.putFile(compressedUri).await()
             val downloadUrl = uploadTask.storage.downloadUrl.await()
             
+            // Clean up compressed file after upload
+            withContext(Dispatchers.IO) {
+                try {
+                    compressedFile.delete()
+                    Log.d(TAG, "Cleaned up temporary compressed file")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not delete temporary compressed file", e)
+                }
+            }
+            
             Log.d(TAG, "Profile picture uploaded successfully. URL: $downloadUrl")
+            Log.d(TAG, "Upload completed with ${compressionRatio}% size reduction")
             
             // Update user profile with new picture URL
             val updateData = hashMapOf<String, Any>(
@@ -341,6 +532,18 @@ class CompleteProfileRepository @Inject constructor(
             
             Log.d(TAG, "Updating profile for user: ${currentUser.uid}")
             
+            // Upload profile picture if provided and different from existing URL
+            var profilePictureUrl = formState.profilePictureUrl
+            
+            if (formState.profilePictureUri.isNotBlank() && formState.profilePictureUri != formState.profilePictureUrl) {
+                Log.d(TAG, "Updating profile picture with compression...")
+                val profileUploadResult = uploadProfilePictureInternal(formState.profilePictureUri, currentUser.uid)
+                if (profileUploadResult.isFailure) {
+                    return profileUploadResult.map { }
+                }
+                profilePictureUrl = profileUploadResult.getOrNull() ?: ""
+            }
+            
             // Upload ID images if provided and different from existing URLs
             var idFrontUrl = formState.idFrontImageUrl
             var idBackUrl = formState.idBackImageUrl
@@ -364,6 +567,7 @@ class CompleteProfileRepository @Inject constructor(
             // Prepare the update data including terms and privacy policy and ID images
             val updateData = hashMapOf(
                 "firstName" to formState.firstName.trim(),
+                "middleName" to formState.middleName.trim(),
                 "lastName" to formState.lastName.trim(),
                 "suffix" to formState.suffix.trim(),
                 "birthDate" to formState.birthDate.trim(),
@@ -374,6 +578,7 @@ class CompleteProfileRepository @Inject constructor(
                 "municipality" to formState.municipality,
                 "barangay" to formState.barangay,
                 "additionalAddress" to formState.additionalAddress.trim(),
+                "profilePictureUrl" to profilePictureUrl,
                 "idFrontImageUrl" to idFrontUrl,
                 "idBackImageUrl" to idBackUrl,
                 "agreedToTerms" to formState.agreedToTerms,

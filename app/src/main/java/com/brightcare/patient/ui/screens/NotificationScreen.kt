@@ -21,6 +21,9 @@ import androidx.navigation.compose.rememberNavController
 import com.brightcare.patient.ui.component.HomeComponent.NotificationCard
 import com.brightcare.patient.ui.theme.*
 import com.brightcare.patient.ui.viewmodel.HomeViewModel
+import com.brightcare.patient.data.service.NotificationTestService
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Notification screen showing all user notifications
@@ -37,6 +40,9 @@ fun NotificationScreen(
     val notifications by homeViewModel.notifications.collectAsState()
     val isLoading by homeViewModel.isLoadingNotifications.collectAsState()
     val unreadCount by homeViewModel.unreadNotificationsCount.collectAsState()
+    
+    // For testing notifications
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = modifier
@@ -152,6 +158,85 @@ fun NotificationScreen(
                         ),
                         textAlign = TextAlign.Center
                     )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // Test notification buttons (for development/testing)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    homeViewModel.createTestNotification()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Blue600
+                            )
+                        ) {
+                            Text(
+                                text = "Test General Notification",
+                                color = White
+                            )
+                        }
+                        
+                        // Get a recent appointment ID for testing
+                        val recentAppointments = homeViewModel.todaysAppointments.collectAsState().value + 
+                                               homeViewModel.upcomingAppointments.collectAsState().value
+                        
+                        if (recentAppointments.isNotEmpty()) {
+                            val appointmentId = recentAppointments.first().id
+                            
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            homeViewModel.simulateAppointmentApproval(appointmentId)
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Green500
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = "✅ Approve",
+                                        color = White,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                
+                                Button(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            homeViewModel.simulateAppointmentRejection(appointmentId)
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Red500
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = "❌ Reject",
+                                        color = White,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                            
+                            Text(
+                                text = "Testing with appointment: ${appointmentId.take(8)}...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Gray500,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
             }
         } else {
@@ -205,6 +290,13 @@ fun NotificationScreenPreview() {
         )
     }
 }
+
+
+
+
+
+
+
 
 
 

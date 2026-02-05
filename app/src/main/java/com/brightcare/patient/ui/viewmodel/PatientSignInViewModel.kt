@@ -1,5 +1,6 @@
 package com.brightcare.patient.ui.viewmodel
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,8 +13,10 @@ import com.brightcare.patient.data.model.LoginValidationState
 import com.brightcare.patient.data.model.ProfileCompletionStatus
 import com.brightcare.patient.data.repository.PatientLoginRepository
 import com.brightcare.patient.ui.component.signup_component.ValidationUtils
+import com.brightcare.patient.utils.EmailThrottleManager
 import com.facebook.CallbackManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,8 +31,12 @@ import javax.inject.Inject
 @HiltViewModel
 class PatientSignInViewModel @Inject constructor(
     private val loginRepository: PatientLoginRepository,
-    private val authenticationManager: com.brightcare.patient.utils.AuthenticationManager
+    private val authenticationManager: com.brightcare.patient.utils.AuthenticationManager,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
+    
+    // Email throttle manager for preventing spam
+    private val emailThrottleManager = EmailThrottleManager.getInstance(context)
     
     // UI State
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -283,25 +290,81 @@ class PatientSignInViewModel @Inject constructor(
     }
     
     /**
-     * Send email verification
+     * Send email verification with throttling
      */
-    fun sendEmailVerification() {
+    fun sendEmailVerification(): EmailThrottleManager.ThrottleResult {
+        val currentUser = loginRepository.getCurrentUser()
+        val userEmail = currentUser?.email ?: ""
+        
+        // Check throttle before attempting to send
+        val throttleResult = emailThrottleManager.canSendEmail(
+            EmailThrottleManager.EmailType.EMAIL_VERIFICATION, 
+            userEmail
+        )
+        
+        if (!throttleResult.canSend) {
+            Log.w(TAG, "Email verification throttled for $userEmail. ${throttleResult.remainingTimeFormatted} remaining")
+            return throttleResult
+        }
+        
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Sending email verification")
+                Log.d(TAG, "Sending email verification to $userEmail")
                 
                 val success = loginRepository.sendEmailVerification()
                 if (success) {
-                    Log.d(TAG, "Email verification sent successfully")
-                    // You can show a toast or update UI state here
+                    // Record successful email send
+                    emailThrottleManager.recordEmailSent(
+                        EmailThrottleManager.EmailType.EMAIL_VERIFICATION,
+                        userEmail
+                    )
+                    Log.d(TAG, "Email verification sent successfully to $userEmail")
                 } else {
-                    Log.w(TAG, "Failed to send email verification")
+                    Log.w(TAG, "Failed to send email verification to $userEmail")
                 }
                 
             } catch (e: Exception) {
-                Log.e(TAG, "Error sending email verification", e)
+                Log.e(TAG, "Error sending email verification to $userEmail", e)
             }
         }
+        
+        return throttleResult
+    }
+    
+    /**
+     * Check if email verification can be sent (for UI state)
+     */
+    fun canSendEmailVerification(): EmailThrottleManager.ThrottleResult {
+        val currentUser = loginRepository.getCurrentUser()
+        val userEmail = currentUser?.email ?: ""
+        return emailThrottleManager.canSendEmail(
+            EmailThrottleManager.EmailType.EMAIL_VERIFICATION, 
+            userEmail
+        )
+    }
+    
+    /**
+     * Get throttle message for email verification
+     */
+    fun getEmailVerificationThrottleMessage(): String {
+        val currentUser = loginRepository.getCurrentUser()
+        val userEmail = currentUser?.email ?: ""
+        return emailThrottleManager.getThrottleMessage(
+            EmailThrottleManager.EmailType.EMAIL_VERIFICATION,
+            userEmail
+        )
+    }
+    
+    /**
+     * Get real-time throttle result for email verification (for UI updates)
+     */
+    fun getEmailVerificationThrottleResult(): EmailThrottleManager.ThrottleResult {
+        val currentUser = loginRepository.getCurrentUser()
+        val userEmail = currentUser?.email ?: ""
+        return emailThrottleManager.canSendEmail(
+            EmailThrottleManager.EmailType.EMAIL_VERIFICATION,
+            userEmail
+        )
     }
     
     /**

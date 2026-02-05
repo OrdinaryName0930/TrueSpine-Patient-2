@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -12,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextDecoration
@@ -159,10 +161,15 @@ fun PatientLoginScreen(
         EmailVerificationDialog(
             onDismiss = { viewModel.clearEmailVerificationDialog() },
             onResendClick = { 
-                viewModel.sendEmailVerification()
-                toastState.showInfo("Verification email sent! Please check your inbox or spam.")
-                viewModel.clearEmailVerificationDialog()
-            }
+                val throttleResult = viewModel.sendEmailVerification()
+                if (throttleResult.canSend) {
+                    toastState.showInfo("Verification email sent! Please check your inbox or spam.")
+                    viewModel.clearEmailVerificationDialog()
+                } else {
+                    toastState.showError("Please wait ${throttleResult.remainingTimeFormatted} to send new verification email")
+                }
+            },
+            viewModel = viewModel
         )
     }
 
@@ -334,13 +341,14 @@ fun PatientLoginScreen(
             )
         }
 
-        // Social Login Buttons
-        Row(
+        // Social Login Buttons - Google centered, Facebook hidden but preserved
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
+            contentAlignment = Alignment.Center
         ) {
+            // Google button centered
             SocialIconButton(
                 provider = SocialProvider.GOOGLE,
                 onClick = {
@@ -357,6 +365,8 @@ fun PatientLoginScreen(
                 loading = uiState.isGoogleLoading,
                 logoSize = 20
             )
+            
+            // Facebook button hidden but code preserved for future use (positioned outside layout flow)
             SocialIconButton(
                 provider = SocialProvider.FACEBOOK,
                 onClick = {
@@ -368,8 +378,11 @@ fun PatientLoginScreen(
                     viewModel.clearErrorMessage()
                     viewModel.signInWithFacebook()
                 },
-                modifier = Modifier.size(45.dp),
-                enabled = !uiState.isFacebookLoading, // Disabled only when Facebook login is loading
+                modifier = Modifier
+                    .size(45.dp)
+                    .alpha(0f) // Hide Facebook button while preserving functionality
+                    .offset(x = 100.dp), // Move out of the way but keep code intact
+                enabled = false, // Disable interaction while hidden
                 loading = uiState.isFacebookLoading,
                 logoSize = 23
             )
@@ -393,8 +406,22 @@ fun PatientLoginScreen(
 @Composable
 private fun EmailVerificationDialog(
     onDismiss: () -> Unit,
-    onResendClick: () -> Unit
+    onResendClick: () -> Unit,
+    viewModel: PatientSignInViewModel = hiltViewModel()
 ) {
+    // Real-time throttle status with countdown timer
+    var throttleResult by remember { mutableStateOf(viewModel.canSendEmailVerification()) }
+    val canResend = throttleResult.canSend
+    
+    // Update throttle status every second for real-time countdown
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000) // Update every second
+            val newResult = viewModel.getEmailVerificationThrottleResult()
+            throttleResult = newResult
+            if (newResult.canSend) break // Stop updating when can send
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -405,11 +432,23 @@ private fun EmailVerificationDialog(
             )
         },
         text = {
-            Text(
-                text = "Please verify your email address before signing in. Check your inbox or spam for the verification link.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Gray700
-            )
+            Column {
+                Text(
+                    text = "Please verify your email address before signing in. Check your inbox or spam for the verification link.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Gray700
+                )
+                
+                // Show throttle message if applicable
+                if (!canResend) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "You can request another verification email in ${throttleResult.remainingTimeFormatted}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         },
 
         // ✅ Use only confirmButton and build custom row INSIDE it
@@ -419,10 +458,13 @@ private fun EmailVerificationDialog(
                 horizontalArrangement = Arrangement.End
             ) {
                 // ✅ LEFT – Resend Email (keeps original functionality)
-                TextButton(onClick = onResendClick) {
+                TextButton(
+                    onClick = onResendClick,
+                    enabled = canResend
+                ) {
                     Text(
-                        text = "Resend Email",
-                        color = Blue500,
+                        text = if (canResend) "Resend Email" else "Wait ${throttleResult.remainingTimeFormatted}",
+                        color = if (canResend) Blue500 else Gray600,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -457,9 +499,45 @@ fun PatientLoginScreenPreview() {
 @Composable
 fun EmailVerificationDialogPreview() {
     BrightCarePatientTheme {
-        EmailVerificationDialog(
-            onDismiss = {},
-            onResendClick = {}
+        // Note: Preview cannot use actual ViewModel, so we'll create a simple version
+        AlertDialog(
+            onDismissRequest = {},
+            title = {
+                Text(
+                    text = "Email Verification Required",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Blue500
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Please verify your email address before signing in. Check your inbox or spam for the verification link.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Gray700
+                    )
+                }
+            },
+            confirmButton = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = {}) {
+                        Text(
+                            text = "Resend Email",
+                            color = Blue500,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    TextButton(onClick = {}) {
+                        Text(
+                            text = "OK",
+                            color = Gray600
+                        )
+                    }
+                }
+            }
         )
     }
 }

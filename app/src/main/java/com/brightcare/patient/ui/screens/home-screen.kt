@@ -1,12 +1,17 @@
 package com.brightcare.patient.ui.screens
 
 import android.app.Activity
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -19,26 +24,27 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brightcare.patient.navigation.NavigationRoutes
 import com.brightcare.patient.ui.theme.*
 import com.brightcare.patient.ui.viewmodel.PatientSignInViewModel
 import com.brightcare.patient.ui.viewmodel.HomeViewModel
 import com.brightcare.patient.ui.component.HomeComponent.HomeHeader
 import com.brightcare.patient.ui.component.HomeComponent.AppointmentCard
-import com.brightcare.patient.ui.component.HomeComponent.NotificationCard
 
 /**
  * Home screen - main dashboard after successful login and profile completion
- * Pangunahing screen pagkatapos ng matagumpay na login at profile completion
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -46,20 +52,38 @@ fun HomeScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
     signInViewModel: PatientSignInViewModel = hiltViewModel(),
-    homeViewModel: HomeViewModel = hiltViewModel()
+    homeViewModel: HomeViewModel = hiltViewModel(),
+    onNavigateToBooking: () -> Unit = {},
+    onNavigateToTab: (String) -> Unit = {}
 ) {
     // Make system navigation bar white with dark icons
     SetWhiteSystemNavBar()
+    
+    // Get context for phone calls
+    val context = LocalContext.current
+    
+    // State to store chiropractor ID for pending call
+    var pendingCallChiropractorId by remember { mutableStateOf<String?>(null) }
+    
+    // Permission launcher for phone calls
+    val callPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted && pendingCallChiropractorId != null) {
+            // Permission granted, make the call
+            homeViewModel.makePhoneCall(context, pendingCallChiropractorId!!)
+            pendingCallChiropractorId = null
+        }
+    }
 
     // Collect UI state
     val uiState by homeViewModel.uiState.collectAsState()
     val userFirstName by homeViewModel.userFirstName.collectAsState()
+    val userProfilePictureUrl by homeViewModel.userProfilePictureUrl.collectAsState()
     val todaysAppointments by homeViewModel.todaysAppointments.collectAsState()
     val upcomingAppointments by homeViewModel.upcomingAppointments.collectAsState()
-    val notifications by homeViewModel.notifications.collectAsState()
     val unreadCount by homeViewModel.unreadNotificationsCount.collectAsState()
     val isLoadingAppointments by homeViewModel.isLoadingAppointments.collectAsState()
-    val isLoadingNotifications by homeViewModel.isLoadingNotifications.collectAsState()
 
     // Pull to refresh state
     var isRefreshing by remember { mutableStateOf(false) }
@@ -72,8 +96,8 @@ fun HomeScreen(
     )
 
     // Handle refresh completion
-    LaunchedEffect(isLoadingAppointments, isLoadingNotifications) {
-        if (!isLoadingAppointments && !isLoadingNotifications && isRefreshing) {
+    LaunchedEffect(isLoadingAppointments) {
+        if (!isLoadingAppointments && isRefreshing) {
             isRefreshing = false
         }
     }
@@ -88,9 +112,10 @@ fun HomeScreen(
                 .fillMaxSize()
                 .pullRefresh(pullRefreshState)
         ) {
-            // Header with user name and notification count
+            // Header with user name, profile picture and notification count
             HomeHeader(
                 firstName = userFirstName,
+                profilePictureUrl = userProfilePictureUrl,
                 unreadCount = unreadCount,
                 onNotificationClick = {
                     navController.navigate("notifications")
@@ -108,10 +133,8 @@ fun HomeScreen(
             // Today's Schedule Section
             SectionHeader(
                 title = "Today's Schedule",
-                subtitle = "Mga appointment ngayong araw",
-                onViewAllClick = { 
-                    navController.navigate("booking")
-                }
+                subtitle = "Your appointments for today",
+                onViewAllClick = onNavigateToBooking
             )
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -121,7 +144,7 @@ fun HomeScreen(
             } else if (todaysAppointments.isEmpty()) {
                 EmptyStateCard(
                     title = "No appointments today",
-                    subtitle = "Walang appointment ngayong araw",
+                    subtitle = "You have no scheduled appointments for today",
                     icon = Icons.Default.EventAvailable
                 )
             } else {
@@ -130,10 +153,20 @@ fun HomeScreen(
                         appointment = appointment,
                         onCardClick = {
                             // Navigate to appointment details
-                            navController.navigate("booking")
+                            navController.navigate("appointment_details/${appointment.id}")
+                        },
+                        onCallClick = {
+                            // Handle call functionality with permission check
+                            handlePhoneCall(
+                                context = context,
+                                chiropractorId = appointment.chiroId,
+                                callPermissionLauncher = callPermissionLauncher,
+                                homeViewModel = homeViewModel,
+                                setPendingCallChiropractorId = { pendingCallChiropractorId = it }
+                            )
                         }
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
             
@@ -142,10 +175,8 @@ fun HomeScreen(
             // Upcoming Schedule Section
             SectionHeader(
                 title = "Upcoming Schedule",
-                subtitle = "Mga susunod na appointment",
-                onViewAllClick = { 
-                    navController.navigate("booking")
-                }
+                subtitle = "Your upcoming appointments",
+                onViewAllClick = onNavigateToBooking
             )
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -155,66 +186,61 @@ fun HomeScreen(
             } else if (upcomingAppointments.isEmpty()) {
                 EmptyStateCard(
                     title = "No upcoming appointments",
-                    subtitle = "Walang susunod na appointment",
+                    subtitle = "You have no upcoming appointments scheduled",
                     icon = Icons.Default.Schedule
                 )
             } else {
-                upcomingAppointments.take(3).forEach { appointment ->
-                    AppointmentCard(
-                        appointment = appointment,
-                        onCardClick = {
-                            // Navigate to appointment details
-                            navController.navigate("booking")
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                // Swipable upcoming appointments
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
+                ) {
+                    items(upcomingAppointments) { appointment ->
+                        AppointmentCard(
+                            appointment = appointment,
+                            modifier = Modifier.width(320.dp), // Fixed width for swipable cards
+                            onCardClick = {
+                                // Navigate to appointment details
+                                navController.navigate("appointment_details/${appointment.id}")
+                            },
+                            onCallClick = {
+                                // Handle call functionality with permission check
+                                handlePhoneCall(
+                                    context = context,
+                                    chiropractorId = appointment.chiroId,
+                                    callPermissionLauncher = callPermissionLauncher,
+                                    homeViewModel = homeViewModel,
+                                    setPendingCallChiropractorId = { pendingCallChiropractorId = it }
+                                )
+                            }
+                        )
+                    }
                 }
                 
-                if (upcomingAppointments.size > 3) {
-                    TextButton(
-                        onClick = { navController.navigate("booking") },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("View ${upcomingAppointments.size - 3} more appointments")
-                    }
+                // Show appointment count if there are multiple appointments
+                if (upcomingAppointments.size > 1) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "${upcomingAppointments.size} upcoming appointments",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = Gray600,
+                            fontSize = 12.sp
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            // Recent Notifications Section
-            SectionHeader(
-                title = "Recent Notifications",
-                subtitle = "Mga kamakailang notification",
-                onViewAllClick = { 
-                    navController.navigate("booking")
+            // Promotional Card Section
+            PromotionalCard(
+                onBookNowClick = {
+                    // Navigate to chiropractor tab in navigation
+                    onNavigateToTab("chiro")
                 }
             )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            if (isLoadingNotifications) {
-                LoadingCard("Loading notifications...")
-            } else if (notifications.isEmpty()) {
-                EmptyStateCard(
-                    title = "No notifications",
-                    subtitle = "Walang notification",
-                    icon = Icons.Default.Notifications
-                )
-            } else {
-                notifications.forEach { notification ->
-                    NotificationCard(
-                        notification = notification,
-                        onCardClick = {
-                            // Handle notification click
-                        },
-                        onMarkAsRead = {
-                            homeViewModel.markNotificationAsRead(notification.id)
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-            }
             
                 Spacer(modifier = Modifier.height(24.dp))
             }
@@ -357,6 +383,168 @@ private fun EmptyStateCard(
 }
 
 /**
+ * Handle phone call with permission check
+ * Hawak ang tawag sa telepono na may permission check
+ */
+private fun handlePhoneCall(
+    context: android.content.Context,
+    chiropractorId: String,
+    callPermissionLauncher: androidx.activity.result.ActivityResultLauncher<String>,
+    homeViewModel: HomeViewModel,
+    setPendingCallChiropractorId: (String?) -> Unit
+) {
+    when (ContextCompat.checkSelfPermission(context, android.Manifest.permission.CALL_PHONE)) {
+        PackageManager.PERMISSION_GRANTED -> {
+            // Permission already granted, make the call
+            homeViewModel.makePhoneCall(context, chiropractorId)
+        }
+        else -> {
+            // Store chiropractor ID and request permission
+            setPendingCallChiropractorId(chiropractorId)
+            callPermissionLauncher.launch(android.Manifest.permission.CALL_PHONE)
+        }
+    }
+}
+
+/**
+ * Promotional card component for whole body chiropractic service
+ * Promotional card component para sa whole body chiropractic service
+ */
+@Composable
+private fun PromotionalCard(
+    onBookNowClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Blue500
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        colors = listOf(Blue500, Blue600)
+                    )
+                )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left side - Service info
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Service title
+                    Text(
+                        text = "Whole Body Chiropractic",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 20.sp
+                        )
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    // Service description
+                    Text(
+                        text = "Complete body alignment & wellness therapy",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 14.sp
+                        )
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Price
+                    Row(
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = "₱",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                        )
+                        Text(
+                            text = "3,499",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 28.sp
+                            )
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Book now button
+                    Button(
+                        onClick = onBookNowClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Blue500
+                        ),
+                        shape = RoundedCornerShape(25.dp),
+                        modifier = Modifier.height(40.dp)
+                    ) {
+                        Text(
+                            text = "Book Now",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = "Book Now",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                
+                // Right side - Decorative icon
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .background(
+                                Color.White.copy(alpha = 0.1f),
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Healing,
+                            contentDescription = "Chiropractic Service",
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
  * Sets the system navigation bar (Back/Home/Overview) to white with dark icons
  */
 @Composable
@@ -382,7 +570,9 @@ fun SetWhiteSystemNavBar() {
 fun HomeScreenPreview() {
     BrightCarePatientTheme {
         HomeScreen(
-            navController = rememberNavController()
+            navController = rememberNavController(),
+            onNavigateToBooking = { }
         )
     }
 }
+

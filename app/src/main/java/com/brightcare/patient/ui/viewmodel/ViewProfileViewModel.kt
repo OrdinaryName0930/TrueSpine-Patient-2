@@ -4,7 +4,11 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brightcare.patient.data.model.ChiropractorProfileModel
+import com.brightcare.patient.data.model.ProfileValidationResult
+import com.brightcare.patient.data.model.Review
 import com.brightcare.patient.data.repository.ChiropractorProfileRepository
+import com.brightcare.patient.data.repository.ProfileValidationService
+import com.brightcare.patient.data.repository.ReviewRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -16,7 +20,9 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ViewProfileViewModel @Inject constructor(
-    private val chiropractorProfileRepository: ChiropractorProfileRepository
+    private val chiropractorProfileRepository: ChiropractorProfileRepository,
+    private val profileValidationService: ProfileValidationService,
+    private val reviewRepository: ReviewRepository
 ) : ViewModel() {
 
     companion object {
@@ -26,6 +32,10 @@ class ViewProfileViewModel @Inject constructor(
     // UI State
     private val _uiState = MutableStateFlow(ViewProfileUiState())
     val uiState: StateFlow<ViewProfileUiState> = _uiState.asStateFlow()
+    
+    // Reviews state
+    private val _reviews = MutableStateFlow<List<Review>>(emptyList())
+    val reviews: StateFlow<List<Review>> = _reviews.asStateFlow()
     
     // Selected tab state
     private val _selectedTabIndex = MutableStateFlow(0)
@@ -38,10 +48,24 @@ class ViewProfileViewModel @Inject constructor(
             1 to false, // Education
             2 to false, // Experience
             3 to false, // Credentials
-            4 to false  // Others
+            4 to false, // Others
+            5 to false  // Reviews
         )
     )
     val tabLoadingStates: StateFlow<Map<Int, Boolean>> = _tabLoadingStates.asStateFlow()
+    
+    // Profile validation state
+    private val _profileValidation = MutableStateFlow(ProfileValidationResult())
+    val profileValidation: StateFlow<ProfileValidationResult> = _profileValidation.asStateFlow()
+    
+    private val _showProfileIncompleteDialog = MutableStateFlow(false)
+    val showProfileIncompleteDialog: StateFlow<Boolean> = _showProfileIncompleteDialog.asStateFlow()
+    
+    private val _isValidatingProfile = MutableStateFlow(false)
+    val isValidatingProfile: StateFlow<Boolean> = _isValidatingProfile.asStateFlow()
+    
+    private val _shouldNavigateToBooking = MutableStateFlow<String?>(null)
+    val shouldNavigateToBooking: StateFlow<String?> = _shouldNavigateToBooking.asStateFlow()
 
     /**
      * Load chiropractor profile by ID
@@ -188,6 +212,7 @@ class ViewProfileViewModel @Inject constructor(
             2 -> chiropractor.experienceHistory.isNotEmpty()
             3 -> chiropractor.professionalCredentials.isNotEmpty()
             4 -> chiropractor.others.isNotEmpty()
+            5 -> _reviews.value.isNotEmpty() // Reviews tab
             else -> false
         }
     }
@@ -205,8 +230,87 @@ class ViewProfileViewModel @Inject constructor(
             2 -> chiropractor.experienceHistory.size
             3 -> chiropractor.professionalCredentials.size
             4 -> chiropractor.others.size
+            5 -> _reviews.value.size // Reviews tab
             else -> 0
         }
+    }
+    
+    /**
+     * Load reviews for chiropractor
+     * I-load ang mga reviews para sa chiropractor
+     */
+    fun loadReviews(chiropractorId: String) {
+        viewModelScope.launch {
+            _tabLoadingStates.update { states ->
+                states.toMutableMap().apply { this[5] = true }
+            }
+            
+            try {
+                val result = reviewRepository.getChiropractorReviews(chiropractorId)
+                result.fold(
+                    onSuccess = { reviewsList ->
+                        _reviews.value = reviewsList
+                        Log.d(TAG, "Successfully loaded ${reviewsList.size} reviews")
+                    },
+                    onFailure = { exception ->
+                        Log.e(TAG, "Failed to load reviews", exception)
+                        _reviews.value = emptyList()
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading reviews", e)
+                _reviews.value = emptyList()
+            } finally {
+                _tabLoadingStates.update { states ->
+                    states.toMutableMap().apply { this[5] = false }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Validate profile for booking
+     */
+    fun validateProfileForBooking(chiropractorId: String) {
+        viewModelScope.launch {
+            try {
+                _isValidatingProfile.value = true
+                
+                val validation = profileValidationService.validateProfileForBooking()
+                
+                _profileValidation.value = validation
+                _showProfileIncompleteDialog.value = !validation.isValid
+                
+                // Trigger navigation if profile is valid
+                if (validation.isValid) {
+                    _shouldNavigateToBooking.value = chiropractorId
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error validating profile", e)
+                _profileValidation.value = ProfileValidationResult(
+                    isValid = false,
+                    errorMessage = "Unable to validate profile. Please try again."
+                )
+                _showProfileIncompleteDialog.value = true
+            } finally {
+                _isValidatingProfile.value = false
+            }
+        }
+    }
+    
+    /**
+     * Hide profile incomplete dialog
+     */
+    fun hideProfileIncompleteDialog() {
+        _showProfileIncompleteDialog.value = false
+    }
+    
+    /**
+     * Clear navigation trigger
+     */
+    fun clearNavigationTrigger() {
+        _shouldNavigateToBooking.value = null
     }
 }
 
@@ -217,7 +321,10 @@ class ViewProfileViewModel @Inject constructor(
 data class ViewProfileUiState(
     val isLoading: Boolean = false,
     val chiropractor: ChiropractorProfileModel? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val profileValidation: ProfileValidationResult = ProfileValidationResult(),
+    val showProfileIncompleteDialog: Boolean = false,
+    val isValidatingProfile: Boolean = false
 ) {
     val hasError: Boolean get() = errorMessage != null
     val hasData: Boolean get() = chiropractor != null && !isLoading

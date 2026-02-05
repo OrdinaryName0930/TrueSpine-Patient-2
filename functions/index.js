@@ -359,3 +359,145 @@ exports.sendOtpEmailSendGrid = functions.https.onCall(async (data, context) => {
     };
   }
 });
+
+/**
+ * Firebase Cloud Function to handle appointment status changes
+ * Automatically creates notifications when appointments are approved/rejected
+ */
+exports.onAppointmentStatusChange = functions.firestore
+  .document('appointment/{appointmentId}')
+  .onUpdate(async (change, context) => {
+    try {
+      const appointmentId = context.params.appointmentId;
+      const beforeData = change.before.data();
+      const afterData = change.after.data();
+      
+      console.log(`🔄 Appointment ${appointmentId} status changed from ${beforeData.status} to ${afterData.status}`);
+      
+      // Only proceed if status actually changed
+      if (beforeData.status === afterData.status) {
+        console.log('Status unchanged, skipping notification');
+        return null;
+      }
+      
+      // Only create notifications for approved/rejected status changes
+      if (afterData.status !== 'approved' && afterData.status !== 'rejected') {
+        console.log(`Status ${afterData.status} doesn't require notification`);
+        return null;
+      }
+      
+      // Get client information
+      const clientId = afterData.clientId;
+      if (!clientId) {
+        console.error('No clientId found in appointment data');
+        return null;
+      }
+      
+      // Create notification data
+      const notificationId = admin.firestore().collection('notifications').doc().id;
+      const currentTime = Date.now();
+      
+      let title, message, type;
+      
+      if (afterData.status === 'approved') {
+        title = "Appointment Approved ✅";
+        message = `Your appointment for ${afterData.date} at ${afterData.time} has been approved!`;
+        type = "appointment_approved";
+      } else if (afterData.status === 'rejected') {
+        title = "Appointment Rejected ❌";
+        message = `Your appointment for ${afterData.date} at ${afterData.time} has been rejected.`;
+        type = "appointment_rejected";
+      }
+      
+      const notification = {
+        id: notificationId,
+        clientId: clientId,
+        clientName: afterData.clientName || "Patient",
+        clientEmail: afterData.clientEmail || "",
+        title: title,
+        message: message,
+        type: type,
+        appointmentId: appointmentId,
+        service: "Chiropractic Care",
+        date: afterData.date,
+        time: afterData.time,
+        createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        timestamp: currentTime,
+        isRead: false
+      };
+      
+      // Save notification to Firestore
+      await admin.firestore()
+        .collection('notifications')
+        .doc(notificationId)
+        .set(notification);
+      
+      console.log(`✅ Notification created for appointment ${appointmentId}: ${title}`);
+      
+      // Optional: Send push notification here if FCM tokens are available
+      // You can extend this to send actual push notifications to the user's device
+      
+      return null;
+      
+    } catch (error) {
+      console.error('Error in onAppointmentStatusChange:', error);
+      return null;
+    }
+  });
+
+/**
+ * Firebase Cloud Function to handle new appointment bookings
+ * Automatically creates notifications when new appointments are booked
+ */
+exports.onNewAppointmentBooked = functions.firestore
+  .document('appointment/{appointmentId}')
+  .onCreate(async (snap, context) => {
+    try {
+      const appointmentId = context.params.appointmentId;
+      const appointmentData = snap.data();
+      
+      console.log(`📅 New appointment booked: ${appointmentId}`);
+      
+      // Get client information
+      const clientId = appointmentData.clientId;
+      if (!clientId) {
+        console.error('No clientId found in appointment data');
+        return null;
+      }
+      
+      // Create notification data for new booking
+      const notificationId = admin.firestore().collection('notifications').doc().id;
+      const currentTime = Date.now();
+      
+      const notification = {
+        id: notificationId,
+        clientId: clientId,
+        clientName: appointmentData.clientName || "Patient",
+        clientEmail: appointmentData.clientEmail || "",
+        title: "New Appointment Booking",
+        message: `New appointment booked for ${appointmentData.date} at ${appointmentData.time}`,
+        type: "new_booking",
+        appointmentId: appointmentId,
+        service: "Chiropractic Care",
+        date: appointmentData.date,
+        time: appointmentData.time,
+        createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        timestamp: currentTime,
+        isRead: false
+      };
+      
+      // Save notification to Firestore
+      await admin.firestore()
+        .collection('notifications')
+        .doc(notificationId)
+        .set(notification);
+      
+      console.log(`✅ New booking notification created for appointment ${appointmentId}`);
+      
+      return null;
+      
+    } catch (error) {
+      console.error('Error in onNewAppointmentBooked:', error);
+      return null;
+    }
+  });

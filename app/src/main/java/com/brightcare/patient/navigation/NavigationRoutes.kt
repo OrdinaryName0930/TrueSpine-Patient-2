@@ -6,7 +6,6 @@ package com.brightcare.patient.navigation
  */
 object NavigationRoutes {
     const val ONBOARDING = "onboarding"
-    const val PERMISSIONS = "permissions"
     const val LOGIN = "login"
     const val SIGNUP = "signup"
     const val TERMS_AND_CONDITIONS = "terms_and_conditions"
@@ -31,6 +30,7 @@ object NavigationRoutes {
     // Booking routes
     const val CHIROPRACTOR_BOOKING = "chiropractor_booking/{chiropractorId}"
     const val BOOK_APPOINTMENT = "book_appointment/{chiropractorId}"
+    const val PAYMENT = "payment/{chiropractorId}/{date}/{time}/{paymentOption}?message={message}"
     const val APPOINTMENT_DETAILS = "appointment_details/{appointmentId}"
     
     // Conversation/Chat routes
@@ -46,6 +46,19 @@ object NavigationRoutes {
     fun bookAppointment(chiropractorId: String) = "book_appointment/$chiropractorId"
     fun viewProfile(chiropractorId: String) = "view_profile/$chiropractorId"
     fun appointmentDetails(appointmentId: String) = "appointment_details/$appointmentId"
+    
+    // Payment route helper - pass all appointment data
+    fun payment(
+        chiropractorId: String,
+        date: String,
+        time: String,
+        paymentOption: String,
+        message: String = ""
+    ): String {
+        val encodedTime = java.net.URLEncoder.encode(time, "UTF-8")
+        val encodedMessage = java.net.URLEncoder.encode(message, "UTF-8")
+        return "payment/$chiropractorId/$date/$encodedTime/$paymentOption?message=$encodedMessage"
+    }
 }
 
 /**
@@ -59,6 +72,12 @@ object NavigationArgs {
     const val CONVERSATION_ID = "conversationId"
     const val CHIROPRACTOR_ID = "chiropractorId"
     const val APPOINTMENT_ID = "appointmentId"
+    
+    // Payment arguments
+    const val DATE = "date"
+    const val TIME = "time"
+    const val PAYMENT_OPTION = "paymentOption"
+    const val MESSAGE = "message"
 }
 
 

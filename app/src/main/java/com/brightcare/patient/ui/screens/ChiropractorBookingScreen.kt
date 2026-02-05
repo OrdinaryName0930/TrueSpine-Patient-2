@@ -82,6 +82,7 @@ fun ChiropractorBookingScreen(
     LaunchedEffect(selectedDate) {
         selectedDate?.let { date ->
             viewModel.loadAvailableTimeSlots(chiropractorId, date)
+            viewModel.loadDoctorBookedTimes(chiropractorId, date)
         }
     }
     
@@ -111,7 +112,7 @@ fun ChiropractorBookingScreen(
                 modifier = Modifier.padding(start = 8.dp)
             ) {
                 Text(
-                    text = "Book Appointment\nMag-book ng Appointment",
+                    text = "Book Appointment",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = Blue500
@@ -148,13 +149,15 @@ fun ChiropractorBookingScreen(
             // Time Slot Selection
             if (selectedDate != null) {
                 item {
+                    val doctorBookedTimes by viewModel.doctorBookedTimes.collectAsStateWithLifecycle()
                     TimeSlotSelectionCard(
                         timeSlots = uiState.availableTimeSlots,
                         selectedTime = uiState.formState.selectedTime,
                         onTimeSelected = { time ->
                             viewModel.selectTimeSlot(time)
                         },
-                        isLoading = uiState.isLoading
+                        isLoading = uiState.isLoading,
+                        doctorBookedTimes = doctorBookedTimes
                     )
                 }
             }
@@ -197,7 +200,7 @@ fun ChiropractorBookingScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Book Appointment\nMag-book ng Appointment",
+                                text = "Book Appointment",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -220,7 +223,8 @@ fun ChiropractorBookingScreen(
                 selectedDate = date
                 showDatePicker = false
             },
-            onDismiss = { showDatePicker = false }
+            onDismiss = { showDatePicker = false },
+            userBookedDates = viewModel.userBookedDates.collectAsStateWithLifecycle().value
         )
     }
     
@@ -392,7 +396,8 @@ private fun TimeSlotSelectionCard(
     selectedTime: String,
     onTimeSelected: (String) -> Unit,
     isLoading: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    doctorBookedTimes: Set<String> = emptySet()
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -435,15 +440,36 @@ private fun TimeSlotSelectionCard(
                     )
                 }
             } else {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(timeSlots) { timeSlot ->
-                        TimeSlotChip(
-                            timeSlot = timeSlot,
-                            isSelected = selectedTime == timeSlot.time,
-                            onClick = { onTimeSelected(timeSlot.time) }
+                // Filter out times that are already booked by other patients
+                val availableTimeSlots = timeSlots.filter { timeSlot ->
+                    !doctorBookedTimes.contains(timeSlot.time)
+                }
+                
+                if (availableTimeSlots.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "All time slots are booked for this date\nLahat ng time slots ay booked na para sa petsang ito",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Gray600,
+                            textAlign = TextAlign.Center
                         )
+                    }
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(availableTimeSlots) { timeSlot ->
+                            TimeSlotChip(
+                                timeSlot = timeSlot,
+                                isSelected = selectedTime == timeSlot.time,
+                                onClick = { onTimeSelected(timeSlot.time) }
+                            )
+                        }
                     }
                 }
             }
@@ -555,13 +581,16 @@ private fun AppointmentDetailsCard(
             OutlinedTextField(
                 value = formState.symptoms,
                 onValueChange = { symptoms ->
-                    onFormStateChanged(
-                        formState.copy(
-                            symptoms = symptoms,
-                            isSymptomsError = false,
-                            symptomsErrorMessage = ""
+                    // Limit to 300 characters
+                    if (symptoms.length <= 300) {
+                        onFormStateChanged(
+                            formState.copy(
+                                symptoms = symptoms,
+                                isSymptomsError = false,
+                                symptomsErrorMessage = ""
+                            )
                         )
-                    )
+                    }
                 },
                 label = { Text("Describe your symptoms*") },
                 placeholder = { Text("Please describe your symptoms or concerns...") },
@@ -571,7 +600,16 @@ private fun AppointmentDetailsCard(
                 isError = formState.isSymptomsError,
                 supportingText = if (formState.isSymptomsError) {
                     { Text(formState.symptomsErrorMessage) }
-                } else null
+                } else {
+                    {
+                        val remainingChars = 300 - formState.symptoms.length
+                        Text(
+                            text = "${formState.symptoms.length}/300 characters • $remainingChars characters remaining",
+                            color = if (remainingChars <= 20) Color.Red else Gray600,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -580,13 +618,24 @@ private fun AppointmentDetailsCard(
             OutlinedTextField(
                 value = formState.notes,
                 onValueChange = { notes ->
-                    onFormStateChanged(formState.copy(notes = notes))
+                    // Limit to 300 characters
+                    if (notes.length <= 300) {
+                        onFormStateChanged(formState.copy(notes = notes))
+                    }
                 },
                 label = { Text("Additional Notes (Optional)") },
                 placeholder = { Text("Any additional information...") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
-                maxLines = 3
+                maxLines = 3,
+                supportingText = {
+                    val remainingChars = 300 - formState.notes.length
+                    Text(
+                        text = "${formState.notes.length}/300 characters • $remainingChars characters remaining",
+                        color = if (remainingChars <= 20) Color.Red else Gray600,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -619,15 +668,27 @@ private fun AppointmentDetailsCard(
 @Composable
 private fun DatePickerDialog(
     onDateSelected: (Date) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    userBookedDates: Set<String> = emptySet()
 ) {
-    // For simplicity, showing next 7 days
-    val availableDates = remember {
+    // For simplicity, showing next 7 days, excluding already booked dates
+    val availableDates = remember(userBookedDates) {
         val calendar = Calendar.getInstance()
-        (1..7).map { dayOffset ->
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        
+        (1..14).mapNotNull { dayOffset -> // Check more days to ensure we have enough options
             calendar.add(Calendar.DAY_OF_MONTH, if (dayOffset == 1) 1 else 1)
-            calendar.time.clone() as Date
-        }
+            val date = calendar.time.clone() as Date
+            val dateString = dateFormat.format(date)
+            val isSunday = Calendar.getInstance().apply { time = date }.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+            
+            // Only include dates that are not already booked and not Sunday
+            if (!userBookedDates.contains(dateString) && !isSunday) {
+                date
+            } else {
+                null
+            }
+        }.take(7) // Take only 7 available dates
     }
     
     val dateFormat = SimpleDateFormat("EEE, MMM dd", Locale.getDefault())

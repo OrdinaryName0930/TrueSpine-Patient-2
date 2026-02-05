@@ -9,6 +9,7 @@ import com.brightcare.patient.navigation.NavigationRoutes
 import com.brightcare.patient.utils.AuthenticationManager
 import com.brightcare.patient.utils.OnboardingPreferences
 import com.brightcare.patient.data.repository.CompleteProfileRepository
+import com.brightcare.patient.data.service.NotificationServiceManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,7 +70,8 @@ fun AuthenticationWrapper(
         }
     }
     
-    // Determine start destination based on authentication, profile completion, onboarding, and permission state
+    // Determine start destination based on authentication, profile completion, and onboarding state
+    // Skip permission checking - permissions will be requested when needed
     val startDestination = remember(isLoggedIn, isProfileComplete) {
         Log.d("AuthenticationWrapper", "Determining start destination - isLoggedIn: $isLoggedIn, isProfileComplete: $isProfileComplete")
         
@@ -78,12 +80,6 @@ fun AuthenticationWrapper(
             !OnboardingPreferences.hasSeenOnboarding(context) -> {
                 Log.d("AuthenticationWrapper", "Start destination: ONBOARDING (onboarding not seen)")
                 NavigationRoutes.ONBOARDING
-            }
-            // Check if permissions have been requested (only if onboarding is done)
-            OnboardingPreferences.hasSeenOnboarding(context) && 
-            !OnboardingPreferences.hasRequestedPermissions(context) -> {
-                Log.d("AuthenticationWrapper", "Start destination: PERMISSIONS (permissions not requested)")
-                NavigationRoutes.PERMISSIONS
             }
             // If logged in, check profile completion
             isLoggedIn -> {
@@ -131,7 +127,8 @@ fun AuthenticationWrapper(
 @dagger.hilt.android.lifecycle.HiltViewModel
 class AuthenticationViewModel @Inject constructor(
     private val authenticationManager: AuthenticationManager,
-    private val completeProfileRepository: CompleteProfileRepository
+    private val completeProfileRepository: CompleteProfileRepository,
+    private val notificationServiceManager: NotificationServiceManager
 ) : androidx.lifecycle.ViewModel() {
     
     val isLoggedIn = authenticationManager.isLoggedIn
@@ -143,8 +140,14 @@ class AuthenticationViewModel @Inject constructor(
     private val _firstName = MutableStateFlow<String?>(null)
     val firstName: StateFlow<String?> = _firstName.asStateFlow()
     
+    private val _middleName = MutableStateFlow<String?>(null)
+    val middleName: StateFlow<String?> = _middleName.asStateFlow()
+    
     private val _lastName = MutableStateFlow<String?>(null)
     val lastName: StateFlow<String?> = _lastName.asStateFlow()
+    
+    private val _suffix = MutableStateFlow<String?>(null)
+    val suffix: StateFlow<String?> = _suffix.asStateFlow()
     
     // Change password state
     private val _changePasswordResult = MutableStateFlow<Result<Unit>?>(null)
@@ -157,6 +160,19 @@ class AuthenticationViewModel @Inject constructor(
     init {
         // Load profile data when ViewModel is created
         loadProfileData()
+        
+        // Start notification services when user is logged in
+        viewModelScope.launch {
+            isLoggedIn.collect { loggedIn ->
+                if (loggedIn) {
+                    Log.d(TAG, "User logged in, starting notification services...")
+                    notificationServiceManager.startNotificationServices()
+                } else {
+                    Log.d(TAG, "User logged out, stopping notification services...")
+                    notificationServiceManager.stopNotificationServices()
+                }
+            }
+        }
     }
     
     /**
@@ -164,6 +180,8 @@ class AuthenticationViewModel @Inject constructor(
      * Logout function na pwedeng ma-access mula sa kahit anong screen
      */
     fun logout() {
+        Log.d(TAG, "Logging out user...")
+        notificationServiceManager.stopNotificationServices()
         authenticationManager.clearLoginState()
     }
     
@@ -208,22 +226,30 @@ class AuthenticationViewModel @Inject constructor(
                 result.onSuccess { profileData ->
                     if (profileData != null) {
                         _firstName.value = profileData.firstName
+                        _middleName.value = profileData.middleName
                         _lastName.value = profileData.lastName
-                        Log.d(TAG, "Profile data loaded: ${profileData.firstName} ${profileData.lastName}")
+                        _suffix.value = profileData.suffix
+                        Log.d(TAG, "Profile data loaded: ${profileData.firstName} ${profileData.middleName} ${profileData.lastName} ${profileData.suffix}")
                     } else {
                         Log.d(TAG, "No profile data found")
                         _firstName.value = null
+                        _middleName.value = null
                         _lastName.value = null
+                        _suffix.value = null
                     }
                 }.onFailure { exception ->
                     Log.e(TAG, "Failed to load profile data: ${exception.message}")
                     _firstName.value = null
+                    _middleName.value = null
                     _lastName.value = null
+                    _suffix.value = null
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading profile data", e)
                 _firstName.value = null
+                _middleName.value = null
                 _lastName.value = null
+                _suffix.value = null
             }
         }
     }

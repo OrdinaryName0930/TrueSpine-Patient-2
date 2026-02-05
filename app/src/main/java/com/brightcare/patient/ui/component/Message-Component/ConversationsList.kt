@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,7 +15,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.brightcare.patient.ui.theme.*
-import kotlinx.coroutines.launch
 
 /**
  * Conversations list component with refresh functionality
@@ -32,7 +30,6 @@ fun ConversationsList(
     onRefresh: () -> Unit = {}
 ) {
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
     
     Box(modifier = modifier.fillMaxSize()) {
         if (conversations.isEmpty()) {
@@ -85,27 +82,6 @@ fun ConversationsList(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
-        }
-        
-        // Floating refresh button
-        FloatingActionButton(
-            onClick = {
-                onRefresh()
-                // Scroll to top to show refresh indicator
-                coroutineScope.launch {
-                    listState.animateScrollToItem(0)
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            containerColor = Blue500,
-            contentColor = White
-        ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Refresh conversations / I-refresh ang mga conversation"
-            )
         }
     }
 }

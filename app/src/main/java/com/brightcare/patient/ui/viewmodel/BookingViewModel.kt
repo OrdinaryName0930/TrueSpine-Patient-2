@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brightcare.patient.data.model.*
 import com.brightcare.patient.data.repository.BookingRepository
+import com.brightcare.patient.data.repository.ChiropractorSearchRepository
 import com.brightcare.patient.data.repository.ProfileValidationService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +23,8 @@ import javax.inject.Inject
 @HiltViewModel
 class BookingViewModel @Inject constructor(
     private val bookingRepository: BookingRepository,
-    private val profileValidationService: ProfileValidationService
+    private val profileValidationService: ProfileValidationService,
+    private val chiropractorSearchRepository: ChiropractorSearchRepository
 ) : ViewModel() {
     
     companion object {
@@ -38,8 +40,15 @@ class BookingViewModel @Inject constructor(
     private val _upcomingAppointments = MutableStateFlow<List<Appointment>>(emptyList())
     val upcomingAppointments: StateFlow<List<Appointment>> = _upcomingAppointments.asStateFlow()
     
+    private val _userBookedDates = MutableStateFlow<Set<String>>(emptySet())
+    val userBookedDates: StateFlow<Set<String>> = _userBookedDates.asStateFlow()
+    
+    private val _doctorBookedTimes = MutableStateFlow<Set<String>>(emptySet())
+    val doctorBookedTimes: StateFlow<Set<String>> = _doctorBookedTimes.asStateFlow()
+    
     init {
         loadUserAppointments()
+        loadUserBookedDates()
     }
     
     /**
@@ -101,6 +110,51 @@ class BookingViewModel @Inject constructor(
     }
     
     /**
+     * Load chiropractor by ID - used when navigating from BookAppointmentActivity to PaymentActivity
+     * I-load ang chiropractor gamit ang ID - ginagamit kapag nag-navigate mula sa BookAppointmentActivity patungo sa PaymentActivity
+     */
+    fun loadChiropractorById(chiropractorId: String) {
+        if (chiropractorId.isBlank()) {
+            Log.w(TAG, "Cannot load chiropractor: ID is blank")
+            return
+        }
+        
+        // Check if already loaded
+        if (_uiState.value.selectedChiropractor?.id == chiropractorId) {
+            Log.d(TAG, "Chiropractor $chiropractorId already loaded")
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Loading chiropractor by ID: $chiropractorId")
+                
+                val result = chiropractorSearchRepository.getChiropractorById(chiropractorId)
+                result.fold(
+                    onSuccess = { chiropractor ->
+                        if (chiropractor != null) {
+                            Log.d(TAG, "Loaded chiropractor: ${chiropractor.name}")
+                            _uiState.value = _uiState.value.copy(
+                                selectedChiropractor = chiropractor,
+                                formState = _uiState.value.formState.copy(
+                                    selectedChiropractorId = chiropractor.id
+                                )
+                            )
+                        } else {
+                            Log.w(TAG, "Chiropractor not found: $chiropractorId")
+                        }
+                    },
+                    onFailure = { exception ->
+                        Log.e(TAG, "Error loading chiropractor: $chiropractorId", exception)
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Unexpected error loading chiropractor", e)
+            }
+        }
+    }
+    
+    /**
      * Load chiropractor unavailability data
      * I-load ang unavailability data ng chiropractor
      */
@@ -148,15 +202,11 @@ class BookingViewModel @Inject constructor(
                 val result = bookingRepository.getAvailableTimeSlots(chiropractorId, date)
                 result.fold(
                     onSuccess = { timeSlots ->
-                        Log.d(TAG, "Loaded ${timeSlots.size} time slots")
-                        
-                        // Filter out unavailable time slots
-                        val filteredTimeSlots = filterUnavailableTimeSlots(timeSlots, date)
-                        Log.d(TAG, "After filtering unavailable slots: ${filteredTimeSlots.size} available")
+                        Log.d(TAG, "Loaded ${timeSlots.size} time slots, ${timeSlots.count { it.isAvailable }} available")
                         
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
-                            availableTimeSlots = filteredTimeSlots,
+                            availableTimeSlots = timeSlots,
                             formState = _uiState.value.formState.copy(
                                 selectedDate = date
                             )
@@ -256,7 +306,9 @@ class BookingViewModel @Inject constructor(
                 
                 _uiState.value = _uiState.value.copy(isSaving = true)
                 
-                Log.d(TAG, "Booking appointment with chiropractor: ${selectedChiropractor?.id}")
+                // Use chiropractor ID from formState if selectedChiropractor is null
+                val chiropractorIdToUse = selectedChiropractor?.id ?: formState.selectedChiropractorId
+                Log.d(TAG, "Booking appointment with chiropractor: $chiropractorIdToUse")
                 
                 val result = bookingRepository.bookAppointment(
                     chiropractorId = formState.selectedChiropractorId,
@@ -265,7 +317,9 @@ class BookingViewModel @Inject constructor(
                     appointmentType = formState.appointmentType,
                     symptoms = if (formState.symptoms.isNotBlank()) formState.symptoms else "General consultation",
                     notes = formState.notes,
-                    isFirstVisit = formState.isFirstVisit
+                    isFirstVisit = formState.isFirstVisit,
+                    paymentOption = formState.paymentOption,
+                    paymentProofUri = formState.paymentProofUri
                 )
                 
                 result.fold(
@@ -304,15 +358,19 @@ class BookingViewModel @Inject constructor(
      */
     private fun validateBookingForm(formState: BookingFormState, chiropractor: Chiropractor?): Boolean {
         Log.d(TAG, "Validating booking form...")
-        Log.d(TAG, "Chiropractor: ${chiropractor?.id}")
+        Log.d(TAG, "Chiropractor object: ${chiropractor?.id}")
+        Log.d(TAG, "Chiropractor ID from formState: ${formState.selectedChiropractorId}")
         Log.d(TAG, "Selected Date: ${formState.selectedDate}")
         Log.d(TAG, "Selected Time: ${formState.selectedTime}")
         Log.d(TAG, "Symptoms: '${formState.symptoms}'")
         Log.d(TAG, "Notes: '${formState.notes}'")
+        Log.d(TAG, "Payment Option: '${formState.paymentOption}'")
+        Log.d(TAG, "Payment Proof URI: '${formState.paymentProofUri}'")
         
         val errors = mutableMapOf<String, String>()
         
-        if (chiropractor == null) {
+        // Check for chiropractor ID - either from object or from formState
+        if (chiropractor == null && formState.selectedChiropractorId.isBlank()) {
             errors["chiropractor"] = "Please select a chiropractor"
             Log.w(TAG, "Validation failed: No chiropractor selected")
         }
@@ -330,6 +388,16 @@ class BookingViewModel @Inject constructor(
         if (formState.symptoms.isBlank()) {
             errors["symptoms"] = "Please describe your symptoms"
             Log.w(TAG, "Validation failed: No symptoms provided")
+        }
+        
+        if (formState.paymentProofUri.isBlank()) {
+            errors["paymentProof"] = "Please upload proof of payment"
+            Log.w(TAG, "Validation failed: No payment proof uploaded")
+        }
+        
+        if (formState.paymentOption.isBlank()) {
+            errors["paymentOption"] = "Please select payment option"
+            Log.w(TAG, "Validation failed: No payment option selected")
         }
         
         val hasErrors = errors.isNotEmpty()
@@ -383,8 +451,9 @@ class BookingViewModel @Inject constructor(
                         _appointments.value = appointments
                         _uiState.value = _uiState.value.copy(isLoading = false)
                         
-                        // Also load upcoming appointments
+                        // Also load upcoming appointments and refresh booked dates
                         loadUpcomingAppointments()
+                        loadUserBookedDates()
                     },
                     onFailure = { exception ->
                         Log.e(TAG, "Error loading appointments", exception)
@@ -400,6 +469,71 @@ class BookingViewModel @Inject constructor(
                     isLoading = false,
                     errorMessage = "Failed to load appointments"
                 )
+            }
+        }
+    }
+    
+    /**
+     * Load user's booked dates to prevent double booking
+     * I-load ang mga booked dates ng user para maiwasan ang double booking
+     */
+    fun loadUserBookedDates() {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Loading user booked dates")
+                
+                val result = bookingRepository.getUserBookedDates()
+                result.fold(
+                    onSuccess = { bookedDates ->
+                        Log.d(TAG, "Loaded ${bookedDates.size} booked dates: $bookedDates")
+                        _userBookedDates.value = bookedDates
+                    },
+                    onFailure = { exception ->
+                        Log.e(TAG, "Error loading booked dates", exception)
+                        // Don't show error to user for this, just keep empty set
+                        _userBookedDates.value = emptySet()
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Unexpected error loading booked dates", e)
+                _userBookedDates.value = emptySet()
+            }
+        }
+    }
+    
+    /**
+     * Check if a date is already booked by the user
+     * I-check kung booked na ng user ang date
+     */
+    fun isDateAlreadyBooked(date: Date): Boolean {
+        val dateString = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(date)
+        return _userBookedDates.value.contains(dateString)
+    }
+    
+    /**
+     * Load booked times for a specific doctor and date
+     * I-load ang mga booked times para sa specific doctor at date
+     */
+    fun loadDoctorBookedTimes(chiropractorId: String, date: Date) {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Loading booked times for chiropractor: $chiropractorId on date: $date")
+                
+                val result = bookingRepository.getBookedTimesForDoctorAndDate(chiropractorId, date)
+                result.fold(
+                    onSuccess = { bookedTimes ->
+                        Log.d(TAG, "Loaded ${bookedTimes.size} booked times: $bookedTimes")
+                        _doctorBookedTimes.value = bookedTimes
+                    },
+                    onFailure = { exception ->
+                        Log.e(TAG, "Error loading doctor booked times", exception)
+                        // Don't show error to user for this, just keep empty set
+                        _doctorBookedTimes.value = emptySet()
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Unexpected error loading doctor booked times", e)
+                _doctorBookedTimes.value = emptySet()
             }
         }
     }

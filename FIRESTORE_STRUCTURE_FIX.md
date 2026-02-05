@@ -70,3 +70,11 @@ The app should now properly load and display all registered chiropractors from y
 
 
 
+
+
+
+
+
+
+
+

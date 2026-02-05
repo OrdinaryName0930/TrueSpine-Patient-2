@@ -133,7 +133,7 @@ fun ConversationComponent(
                 participantName = item.chiropractor.fullName,
                 participantType = com.brightcare.patient.ui.component.messagecomponent.SenderType.DOCTOR, // All chiropractors are doctors
                 lastMessage = item.lastMessage ?: "Tap to start conversation",
-                lastMessageTime = item.lastMessageTime ?: Date(),
+                lastMessageTime = item.lastMessageTime ?: Date(0), // Use epoch time for new conversations to avoid "just now"
                 unreadCount = item.unreadCount,
                 isOnline = item.chiropractor.isAvailable,
                 profileImageUrl = item.chiropractor.profileImage, // Pass the actual profile image URL

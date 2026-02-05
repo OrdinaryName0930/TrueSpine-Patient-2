@@ -24,33 +24,29 @@ import java.util.*
 
 /**
  * Card component for displaying appointment information
- * Card component para sa pagpapakita ng appointment information
  */
 @Composable
 fun AppointmentCard(
     appointment: Appointment,
     onCardClick: () -> Unit = {},
+    onCallClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 2.dp),
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         colors = CardDefaults.cardColors(
-            containerColor = when (appointment.status) {
-                "confirmed", "approved" -> Green50
-                "pending" -> Blue50
-                "cancelled" -> Red50
-                else -> Gray50
-            }
+            containerColor = Blue500
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(16.dp),
         onClick = onCardClick
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -61,63 +57,102 @@ fun AppointmentCard(
                 // Chiropractor name
                 Text(
                     text = appointment.chiropractorName.ifEmpty { "Dr. ${appointment.chiroId}" },
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        color = Gray900
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 16.sp
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 
-                // Specialization
-                if (appointment.chiropractorSpecialization.isNotEmpty()) {
+                // Specialization or appointment type
+                Text(
+                    text = if (appointment.chiropractorSpecialization.isNotEmpty()) {
+                        appointment.chiropractorSpecialization
+                    } else {
+                        appointment.appointmentType.displayName
+                    },
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 14.sp
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Date row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = "Date",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = appointment.chiropractorSpecialization,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = Gray600,
-                            fontSize = 11.sp
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        text = formatDate(appointment.date),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 
-                // Date and time
+                // Time row
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Default.Schedule,
                         contentDescription = "Time",
-                        tint = Blue600,
-                        modifier = Modifier.size(14.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = formatDateTime(appointment.date, appointment.time),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = Gray700,
-                            fontSize = 11.sp
+                        text = formatTime(appointment.time),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = Color.White,
+                            fontSize = 14.sp
                         )
                     )
                 }
             }
             
-            // Right side - Status and type
+            // Right side - Status and call button
             Column(
-                horizontalAlignment = Alignment.End
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Status badge
                 StatusBadge(status = appointment.status)
                 
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                // Appointment type icon
-                AppointmentTypeIcon(type = appointment.appointmentType)
+                // Call button
+                IconButton(
+                    onClick = onCallClick,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            Color.White.copy(alpha = 0.2f),
+                            RoundedCornerShape(20.dp)
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Phone,
+                        contentDescription = "Call",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
@@ -125,83 +160,66 @@ fun AppointmentCard(
 
 /**
  * Status badge component
- * Status badge component
  */
 @Composable
 private fun StatusBadge(status: String) {
     val (backgroundColor, textColor, text) = when (status.lowercase()) {
-        "confirmed", "approved" -> Triple(Green100, Green800, "Confirmed")
-        "pending" -> Triple(Blue100, Blue800, "Pending")
-        "cancelled" -> Triple(Red100, Red800, "Cancelled")
-        "completed" -> Triple(Gray100, Gray800, "Completed")
-        else -> Triple(Gray100, Gray800, status.capitalize())
+        "confirmed", "approved" -> Triple(Green500, Color.White, "Confirmed")
+        "pending" -> Triple(Orange500, Color.White, "Pending")
+        "cancelled" -> Triple(Red500, Color.White, "Cancelled")
+        "completed" -> Triple(Gray600, Color.White, "Completed")
+        else -> Triple(Gray600, Color.White, status.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() })
     }
     
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
-            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall.copy(
                 color = textColor,
-                fontWeight = FontWeight.Medium,
-                fontSize = 9.sp
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 10.sp
             )
         )
     }
 }
 
+
 /**
- * Appointment type icon
- * Appointment type icon
+ * Format date for display
  */
-@Composable
-private fun AppointmentTypeIcon(type: AppointmentType) {
-    val (icon, tint) = when (type) {
-        AppointmentType.CONSULTATION -> Icons.Default.Chat to Blue600
-        AppointmentType.TREATMENT -> Icons.Default.Healing to Green600
-        AppointmentType.FOLLOW_UP -> Icons.Default.Refresh to Orange600
-        AppointmentType.THERAPY -> Icons.Default.FitnessCenter to Purple600
-        AppointmentType.ADJUSTMENT -> Icons.Default.Build to Teal600
-        AppointmentType.ASSESSMENT -> Icons.Default.Assessment to Indigo600
+private fun formatDate(date: String): String {
+    return try {
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val displayDateFormat = SimpleDateFormat("EEEE, dd MMMM", Locale.getDefault())
+        
+        val parsedDate = dateFormat.parse(date)
+        if (parsedDate != null) {
+            displayDateFormat.format(parsedDate)
+        } else date
+    } catch (e: Exception) {
+        date
     }
-    
-    Icon(
-        imageVector = icon,
-        contentDescription = type.displayName,
-        tint = tint,
-        modifier = Modifier.size(16.dp)
-    )
 }
 
 /**
- * Format date and time for display
- * I-format ang date at time para sa display
+ * Format time for display
  */
-private fun formatDateTime(date: String, time: String): String {
+private fun formatTime(time: String): String {
     return try {
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val displayDateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
         val displayTimeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
         
-        val parsedDate = dateFormat.parse(date)
         val parsedTime = timeFormat.parse(time)
-        
-        val formattedDate = if (parsedDate != null) {
-            displayDateFormat.format(parsedDate)
-        } else date
-        
-        val formattedTime = if (parsedTime != null) {
+        if (parsedTime != null) {
             displayTimeFormat.format(parsedTime)
         } else time
-        
-        "$formattedDate at $formattedTime"
     } catch (e: Exception) {
-        "$date at $time"
+        time
     }
 }
 
@@ -214,13 +232,15 @@ fun AppointmentCardPreview() {
                 id = "1",
                 chiroId = "chiro1",
                 clientId = "client1",
-                date = "2025-12-08",
+                date = "2025-12-15",
                 time = "14:30",
                 status = "confirmed",
-                chiropractorName = "Dr. Maria Santos",
-                chiropractorSpecialization = "Spinal Adjustment Specialist",
+                chiropractorName = "Dr. Alana Rueter",
+                chiropractorSpecialization = "Dentist Consultation",
                 appointmentType = AppointmentType.CONSULTATION
-            )
+            ),
+            onCardClick = { },
+            onCallClick = { }
         )
     }
 }
@@ -234,16 +254,25 @@ fun AppointmentCardPendingPreview() {
                 id = "2",
                 chiroId = "chiro2",
                 clientId = "client1",
-                date = "2025-12-09",
-                time = "10:00",
+                date = "2025-12-16",
+                time = "09:00",
                 status = "pending",
-                chiropractorName = "Dr. Juan Dela Cruz",
+                chiropractorName = "Dr. Maria Santos",
                 chiropractorSpecialization = "Physical Therapy",
                 appointmentType = AppointmentType.TREATMENT
-            )
+            ),
+            onCardClick = { },
+            onCallClick = { }
         )
     }
 }
+
+
+
+
+
+
+
 
 
 

@@ -14,7 +14,6 @@ object OnboardingPreferences {
     
     private const val PREFS_NAME = "brightcare_onboarding_prefs"
     private const val KEY_HAS_SEEN_ONBOARDING = "has_seen_onboarding"
-    private const val KEY_HAS_REQUESTED_PERMISSIONS = "has_requested_permissions"
     
     /**
      * Get SharedPreferences instance
@@ -58,30 +57,6 @@ object OnboardingPreferences {
         getPrefs(context)
             .edit()
             .putBoolean(KEY_HAS_SEEN_ONBOARDING, false)
-            .apply()
-    }
-    
-    /**
-     * Check if permissions have been requested before
-     * Tingnan kung na-request na ang mga permissions dati
-     * 
-     * @param context Application context
-     * @return true if permissions have been requested, false otherwise
-     */
-    fun hasRequestedPermissions(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_HAS_REQUESTED_PERMISSIONS, false)
-    }
-    
-    /**
-     * Mark that permissions have been requested
-     * Markahan na na-request na ang mga permissions
-     * 
-     * @param context Application context
-     */
-    fun setPermissionsRequested(context: Context) {
-        getPrefs(context)
-            .edit()
-            .putBoolean(KEY_HAS_REQUESTED_PERMISSIONS, true)
             .apply()
     }
     

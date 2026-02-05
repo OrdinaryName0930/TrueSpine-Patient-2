@@ -202,6 +202,18 @@ class NotificationRepository @Inject constructor(
     }
     
     /**
+     * Create a test notification to verify the system is working
+     * Gumawa ng test notification para ma-verify na gumagana ang system
+     */
+    suspend fun createTestNotification(): Result<String> {
+        return createNotification(
+            title = "🧪 Test Notification",
+            message = "This is a test notification to verify the system is working properly. If you see this, notifications are working! 🎉",
+            type = NotificationType.GENERAL
+        )
+    }
+    
+    /**
      * Create a new notification (for testing purposes)
      * Gumawa ng bagong notification (para sa testing)
      */
@@ -212,13 +224,27 @@ class NotificationRepository @Inject constructor(
         appointmentId: String? = null
     ): Result<String> {
         return try {
+            Log.d(TAG, "=== CREATING NOTIFICATION ===")
+            Log.d(TAG, "Title: $title")
+            Log.d(TAG, "Message: $message")
+            Log.d(TAG, "Type: ${type.value}")
+            Log.d(TAG, "AppointmentId: $appointmentId")
+            
             val currentUser = firebaseAuth.currentUser
             if (currentUser == null) {
+                Log.e(TAG, "❌ No authenticated user found!")
                 return Result.failure(Exception("User must be logged in"))
             }
             
+            Log.d(TAG, "✅ User authenticated: ${currentUser.uid}")
+            Log.d(TAG, "User name: ${currentUser.displayName}")
+            Log.d(TAG, "User email: ${currentUser.email}")
+            
             val notificationId = firestore.collection(COLLECTION_NOTIFICATIONS).document().id
             val currentTime = System.currentTimeMillis()
+            
+            Log.d(TAG, "Generated notification ID: $notificationId")
+            Log.d(TAG, "Timestamp: $currentTime")
             
             val notification = Notification(
                 id = notificationId,
@@ -234,20 +260,37 @@ class NotificationRepository @Inject constructor(
                 isRead = false
             )
             
+            Log.d(TAG, "Notification object created: $notification")
+            Log.d(TAG, "Notification map: ${notification.toMap()}")
+            
+            Log.d(TAG, "Writing to Firestore collection: $COLLECTION_NOTIFICATIONS")
             firestore.collection(COLLECTION_NOTIFICATIONS)
                 .document(notificationId)
                 .set(notification.toMap())
                 .await()
             
-            Log.d(TAG, "Notification created successfully: $notificationId")
+            Log.d(TAG, "✅ Notification written to Firestore successfully!")
+            Log.d(TAG, "Notification ID: $notificationId")
+            Log.d(TAG, "=== NOTIFICATION CREATION COMPLETE ===")
+            
             Result.success(notificationId)
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error creating notification", e)
+            Log.e(TAG, "❌ Error creating notification", e)
+            Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
+            Log.e(TAG, "Exception message: ${e.message}")
+            Log.e(TAG, "Stack trace: ${e.stackTrace.joinToString("\n")}")
             Result.failure(Exception("Failed to create notification: ${e.message}"))
         }
     }
 }
+
+
+
+
+
+
+
 
 
 

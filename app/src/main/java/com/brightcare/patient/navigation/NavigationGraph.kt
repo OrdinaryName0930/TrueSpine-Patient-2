@@ -11,7 +11,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.brightcare.patient.ui.screens.*
-import com.brightcare.patient.ui.component.PermissionRequestScreen
 import com.brightcare.patient.utils.OnboardingPreferences
 import android.util.Log
 
@@ -40,25 +39,10 @@ fun NavigationGraph(
                     // Markahan ang onboarding bilang nakita na
                     OnboardingPreferences.setOnboardingSeen(context)
                     
-                    // Navigate to permissions screen
-                    navController.navigate(NavigationRoutes.PERMISSIONS) {
-                        popUpTo(NavigationRoutes.ONBOARDING) { inclusive = true }
-                    }
-                }
-            )
-        }
-        
-        // Permission Request Screen
-        composable(NavigationRoutes.PERMISSIONS) {
-            val context = LocalContext.current
-            PermissionRequestScreen(
-                onPermissionsGranted = {
-                    // Mark permissions as requested
-                    OnboardingPreferences.setPermissionsRequested(context)
-                    
-                    // Navigate to login after permissions
+                    // Navigate directly to login screen (skip permissions)
+                    // Direktang pumunta sa login screen (laktawan ang permissions)
                     navController.navigate(NavigationRoutes.LOGIN) {
-                        popUpTo(NavigationRoutes.PERMISSIONS) { inclusive = true }
+                        popUpTo(NavigationRoutes.ONBOARDING) { inclusive = true }
                     }
                 }
             )
@@ -360,6 +344,38 @@ fun NavigationGraph(
             BookAppointmentActivity(
                 chiropractorId = chiropractorId,
                 navController = navController
+            )
+        }
+        
+        // Payment Activity Screen
+        composable(
+            NavigationRoutes.PAYMENT,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(600)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(600)
+                )
+            }
+        ) { backStackEntry ->
+            val chiropractorId = backStackEntry.arguments?.getString(NavigationArgs.CHIROPRACTOR_ID) ?: ""
+            val date = backStackEntry.arguments?.getString(NavigationArgs.DATE) ?: ""
+            val time = java.net.URLDecoder.decode(backStackEntry.arguments?.getString(NavigationArgs.TIME) ?: "", "UTF-8")
+            val paymentOption = backStackEntry.arguments?.getString(NavigationArgs.PAYMENT_OPTION) ?: "downpayment"
+            val message = java.net.URLDecoder.decode(backStackEntry.arguments?.getString(NavigationArgs.MESSAGE) ?: "", "UTF-8")
+            
+            PaymentActivity(
+                navController = navController,
+                chiropractorId = chiropractorId,
+                date = date,
+                time = time,
+                paymentOption = paymentOption,
+                message = message
             )
         }
         

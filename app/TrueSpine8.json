@@ -1,0 +1,639 @@
+{
+  "appointment": {
+    "20c43f81-e473-498a-b723-e706c88adc41": {
+      "date": "2025-12-16",
+      "createdAt": 1765728488,
+      "chiroId": "GHkvU5c8c4SZHqK63HwJ18TDvEZ2",
+      "clientId": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "bookedByUid": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "time": "10:30",
+      "whoBooked": "client",
+      "message": "jsisjs. jsisjs",
+      "status": "rejected",
+      "updatedAt": 1765732699
+    },
+    "57ecaff3-bd0e-4037-a560-6fe336b2aca0": {
+      "date": "2025-12-15",
+      "createdAt": 1765727796,
+      "chiroId": "GHkvU5c8c4SZHqK63HwJ18TDvEZ2",
+      "clientId": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "bookedByUid": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "time": "19:00",
+      "whoBooked": "client",
+      "message": "yhzbzhsjsjsbsisis. yhzbzhsjsjsbsisis",
+      "status": "approved",
+      "updatedAt": 1765728298
+    },
+    "bb0850e3-7c9c-4aff-b3b8-1d245849b595": {
+      "date": "2026-02-03",
+      "createdAt": 1765728804,
+      "chiroId": "xtulP0be1XhtUsoNsA4UwLFNFpv2",
+      "clientId": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "bookedByUid": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "time": "10:30",
+      "whoBooked": "client",
+      "message": "General consultation",
+      "status": "approved",
+      "updatedAt": 1765732703
+    },
+    "d433335c-fba2-4c51-a28b-2457771d67cb": {
+      "date": "2025-12-17",
+      "createdAt": 1765746624,
+      "chiroId": "oCxcARqFoRXmYOJ2ipm7xCZXf9p1",
+      "clientId": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "bookedByUid": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "time": "10:30",
+      "whoBooked": "client",
+      "message": "hsjshshsisjs. hsjshshsisjs",
+      "status": "pending"
+    }
+  },
+  "blocked_clients": {
+    "7FyPMJSG9Wm2bdYaCfpp": {
+      "reason": "Blocked by chiropractor",
+      "clientId": "7eCjMiqC04SYEn7QWjVJ0NvdHat1",
+      "clientName": "Michael Joshua Taleon",
+      "blockedAt": 1765194262002,
+      "blockedBy": "oCxcARqFoRXmYOJ2ipm7xCZXf9p1"
+    },
+    "HRC84dWL6pxaiyBArh8H": {
+      "reason": "Blocked by chiropractor",
+      "clientId": "7eCjMiqC04SYEn7QWjVJ0NvdHat1",
+      "clientName": "Michael Joshua Taleon",
+      "blockedAt": 1765194247351,
+      "blockedBy": "oCxcARqFoRXmYOJ2ipm7xCZXf9p1"
+    }
+  },
+  "chiropractors": {
+    "GHkvU5c8c4SZHqK63HwJ18TDvEZ2": {
+      "role": "Doctor",
+      "prcLicenseNumber": "7765555jshshshsh",
+      "contactNumber": "09646434345",
+      "about": "bsisjsbshsjsbs",
+      "suffix": "",
+      "email": "dr.joshuamiller08@gmail.com",
+      "lastName": "Miller",
+      "firstName": "Joshua",
+      "yearsOfExperience": 17,
+      "startYear": 2008,
+      "name": "Joshua Cao Miller",
+      "middleName": "Cao",
+      "pitahcAccreditationNumber": "Cch 643412",
+      "specialization": "Professional Chiropractor",
+      "serviceHours": "Monday to Saturday 10am to 7pm",
+      "licenseExpiry": "15 Dec 2030",
+      "profileImageUrl": "https://firebasestorage.googleapis.com/v0/b/truespine-e8576.firebasestorage.app/o/profile_images%2FGHkvU5c8c4SZHqK63HwJ18TDvEZ2%2F1765739133059.jpg?alt=media&token=89cbc44c-eaf4-40bd-b134-377c8f15d17d",
+      "education": {
+        "D04xX1AVE9tEVNNZewIZ": {
+          "institution": "deddd",
+          "current": false,
+          "endDate": "Dec 2025",
+          "degree": "ddddd",
+          "description": "rrdd",
+          "id": null,
+          "startDate": "Dec 2025"
+        },
+        "WPjrrGitmWHd7j6DRgS3": {
+          "institution": "Laguna University",
+          "current": false,
+          "endDate": "Dec 2021",
+          "degree": "BSC",
+          "description": "",
+          "id": null,
+          "startDate": "Dec 2017"
+        }
+      },
+      "experienceHistory": {
+        "OAP0SZ8GzgAc4GrY2WA5": {
+          "current": false,
+          "endDate": "Nov 2025",
+          "organization": "BrightCare",
+          "description": "",
+          "id": null,
+          "position": "Chiropractor",
+          "startDate": "Oct 2025"
+        },
+        "OgfhcaiOWXmaXMAdUnPG": {
+          "current": false,
+          "endDate": "Dec 2025",
+          "organization": "shhshs",
+          "description": "jshsgsysgs",
+          "id": null,
+          "position": "mjzhxhz",
+          "startDate": "Dec 2025"
+        }
+      },
+      "others": {
+        "F3S7eUtruyZBjD2ADNXr": {
+          "date": "dddd",
+          "description": "dfdd",
+          "id": null,
+          "category": "rred",
+          "title": "dddd"
+        },
+        "Tu4qaAJfPhxuCeRWVwoO": {
+          "date": "Dec 8, 2019",
+          "description": "",
+          "id": null,
+          "category": "Skill",
+          "title": "Junior"
+        }
+      },
+      "professionalCredentials": {
+        "7Ht3dA94mBxOsyhLfnDC": {
+          "institution": "Benilde",
+          "year": "2025",
+          "imageUrl": null,
+          "description": "bsjshshsgsg",
+          "id": null,
+          "title": "Backehrlor if scunr in scune",
+          "type": "Education"
+        },
+        "msVO5SxGBEN8wL0Upyef": {
+          "institution": "BrightCare",
+          "year": "2021",
+          "imageUrl": null,
+          "description": "",
+          "id": null,
+          "title": "Doctor of Chiropractic",
+          "type": "Education"
+        }
+      }
+    },
+    "oCxcARqFoRXmYOJ2ipm7xCZXf9p1": {
+      "role": "Doctor",
+      "email": "dr.vanessacruz10@gmail.com",
+      "prcLicenseNumber": "1263738362828272",
+      "lastName": "Cruz",
+      "contactNumber": "09081234567",
+      "middleName": "Co",
+      "suffix": "",
+      "yearsOfExperience": 14,
+      "startYear": 2011,
+      "firstName": "Vanessahshs",
+      "name": "Vanessahshs Co Cruz",
+      "pitahcAccreditationNumber": "Cch 004025",
+      "about": "Dr. Vanessa Co Cruz is a licensed chiropractor dedicated to helping patients relieve pain, improve mobility, and restore overall wellness through safe, evidence-based chiropractic care.",
+      "profileImageUrl": "https://firebasestorage.googleapis.com/v0/b/truespine-e8576.firebasestorage.app/o/profile_images%2FoCxcARqFoRXmYOJ2ipm7xCZXf9p1%2F1765217766045.jpg?alt=media&token=8c1cf6f5-7598-43da-b016-5938722572f2",
+      "serviceHours": "Monday to Saturday 10am to 7pm",
+      "specialization": "Professional Chiropractor",
+      "education": {
+        "UyXvycZQMrmKqKtiexEa": {
+          "institution": "Camara Institute for Chiropractic Sciences",
+          "current": false,
+          "endDate": "Mar 2021",
+          "degree": "Bachelor’s Degree in Health Sciences",
+          "description": "",
+          "id": null,
+          "startDate": "Feb 2017"
+        }
+      },
+      "experienceHistory": {
+        "OuoTH5msM1c143SXzMFv": {
+          "current": false,
+          "endDate": "Jul 2024",
+          "organization": "Palagutok clinic",
+          "description": "",
+          "id": null,
+          "position": "Chiropractic Practitioner",
+          "startDate": "Nov 2020"
+        }
+      },
+      "professionalCredentials": {
+        "TjU2pGaUKHQrmcwADTkk": {
+          "institution": "Camara Institute for Chiropractic Sciences",
+          "year": "2020",
+          "imageUrl": null,
+          "description": "",
+          "id": null,
+          "title": "DOCTOR OF CHIROPRACTIC (DC)",
+          "type": "Education"
+        }
+      }
+    },
+    "xtulP0be1XhtUsoNsA4UwLFNFpv2": {
+      "role": "Doctor",
+      "yearsOfExperience": 12,
+      "name": "Dr. Emily Santos",
+      "contactNumber": "0917-123-4567",
+      "profileImageUrl": "",
+      "email": "dr.emilysantos08@gmail.com",
+      "specialization": "Professional Chiropractor",
+      "serviceHours": "Monday to Saturday 10am to 7pm"
+    }
+  },
+  "client": {},
+  "closed_schedules": {
+    "1wtvvX9Va7heDjCO65IC": {
+      "date": "Thursday, 25 December 2025",
+      "createdAt": 1765746559857,
+      "isFullDay": true,
+      "fromTime": "",
+      "toTime": "",
+      "status": "active"
+    },
+    "DvTBuk81zlcmKbw6Qnmp": {
+      "date": "Wednesday, 10 December 2025",
+      "createdAt": 1765214922923,
+      "isFullDay": false,
+      "fromTime": "10:00 AM",
+      "toTime": "7:00 PM",
+      "status": "active"
+    },
+    "W5fFnzt11S81w91CLEPV": {
+      "date": "Wednesday, 17 December 2025",
+      "createdAt": 1765746452382,
+      "isFullDay": true,
+      "fromTime": "",
+      "toTime": "",
+      "status": "active"
+    },
+    "XLk8bXaRc2SjNJMrVLdG": {
+      "date": "Thursday, 11 December 2025",
+      "createdAt": 1765215375205,
+      "isFullDay": true,
+      "fromTime": "",
+      "toTime": "",
+      "status": "active"
+    },
+    "kqOzDvPKPl4DM8wxfsjr": {
+      "date": "Wednesday, 10 December 2025",
+      "createdAt": 1765215433339,
+      "isFullDay": true,
+      "fromTime": "",
+      "toTime": "",
+      "status": "active"
+    }
+  },
+  "conversations": {
+    "c879aeb6-859e-4b04-b887-8a14fe957a10": {
+      "createdAt": {
+        "_seconds": 1765746633,
+        "_nanoseconds": 587000000
+      },
+      "id": "c879aeb6-859e-4b04-b887-8a14fe957a10",
+      "participants": [
+        "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+        "oCxcARqFoRXmYOJ2ipm7xCZXf9p1"
+      ],
+      "lastMessageType": "text",
+      "lastMessage": "msmskshshs",
+      "lastMessageSenderId": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "updatedAt": {
+        "_seconds": 1765746633,
+        "_nanoseconds": 718000000
+      },
+      "unreadCounts": {
+        "DSpuLEUlMiZ5XfkflVD8kdE2RHY2": 0,
+        "oCxcARqFoRXmYOJ2ipm7xCZXf9p1": 0
+      },
+      "messages": {
+        "3682ab93-d66e-44ad-a0f2-37ebed583d92": {
+          "senderId": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+          "fileName": null,
+          "fileSize": 0,
+          "replyToMessageId": null,
+          "isRead": false,
+          "fileUrl": null,
+          "id": "3682ab93-d66e-44ad-a0f2-37ebed583d92",
+          "mimeType": null,
+          "type": "text",
+          "content": "msmskshshs",
+          "timestamp": {
+            "_seconds": 1765746633,
+            "_nanoseconds": 718000000
+          }
+        }
+      }
+    }
+  },
+  "notifications": {
+    "2bphNqRJIzPKWWQKZPkj": {
+      "date": "13 December 2025",
+      "createdAt": "2025-12-09 03:18:54",
+      "clientId": "KgQYffTKDkNFSi9B928xFnwlQWP2",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "fa1bc039-7ff3-4a93-ae3f-d84939f3cae1",
+      "service": "Chiropractic Care",
+      "time": "10:30",
+      "title": "Appointment Approved ✅",
+      "message": "Your appointment for 13 December 2025 at 10:30 has been approved!",
+      "type": "appointment_approved",
+      "timestamp": 1765221534983,
+      "isRead": true
+    },
+    "4GK29kRuXLdKabzRLdGS": {
+      "date": "15 December 2025",
+      "createdAt": "2025-12-15 00:04:58",
+      "clientId": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "57ecaff3-bd0e-4037-a560-6fe336b2aca0",
+      "service": "Chiropractic Care",
+      "time": "19:00",
+      "title": "Appointment Approved ✅",
+      "message": "Your appointment for 15 December 2025 at 19:00 has been approved!",
+      "type": "appointment_approved",
+      "timestamp": 1765728298534,
+      "isRead": true
+    },
+    "76NZrfSqtKm2CNVrNr6b": {
+      "date": "2026-02-05",
+      "clientId": "7eCjMiqC04SYEn7QWjVJ0NvdHat1",
+      "clientName": "Michael Joshua Taleon",
+      "clientEmail": "michaeljoshuataleon.edu@gmail.com",
+      "title": "Appointment Approved & Scheduled",
+      "message": "Appointment scheduled for Michael Joshua Taleon on 2026-02-05 at 06:51 AM",
+      "type": "appointment_approved",
+      "clientPhone": "09053303821",
+      "createdAt": "2025-12-09 04:51:43",
+      "appointmentId": "b59cbc2a-e725-4c45-b032-cc09db7883bb",
+      "service": "Chiropractic Care",
+      "time": "06:51 AM",
+      "timestamp": 1765227103650,
+      "isRead": true
+    },
+    "8xwXlatQqZQw42SDLHun": {
+      "date": "2 March 2026",
+      "createdAt": "2025-12-09 04:01:38",
+      "clientId": "KgQYffTKDkNFSi9B928xFnwlQWP2",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "7f9b73e1-3ef2-4e53-b11d-758d88f745d3",
+      "service": "Chiropractic Care",
+      "time": "10:30",
+      "title": "Appointment Approved ✅",
+      "message": "Your appointment for 2 March 2026 at 10:30 has been approved!",
+      "type": "appointment_approved",
+      "timestamp": 1765224098772,
+      "isRead": true
+    },
+    "BnOAykHs9fsw7sKG7yPt": {
+      "date": "2026-04-03",
+      "clientId": "sWEaG8LaBGXt4CAZXu3MXyjzckX2",
+      "clientName": "Jemaicy Codog",
+      "clientEmail": "jemaicycodog53@gmail.com",
+      "title": "Appointment Approved & Scheduled",
+      "message": "Appointment scheduled for Jemaicy Codog on 2026-04-03 at 04:52 AM",
+      "type": "appointment_approved",
+      "clientPhone": "09638167129",
+      "createdAt": "2025-12-09 04:52:10",
+      "appointmentId": "8b11f09f-d4ba-4f18-9f57-0001d5e14659",
+      "service": "Chiropractic Care",
+      "time": "04:52 AM",
+      "timestamp": 1765227130925,
+      "isRead": true
+    },
+    "CGrSQgMeP66HVhcRCNTT": {
+      "date": "11 December 2025",
+      "createdAt": "2025-12-09 07:24:14",
+      "clientId": "7eCjMiqC04SYEn7QWjVJ0NvdHat1",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "e5447665-f0f4-4e4a-8f71-3251adf7b1bf",
+      "service": "Chiropractic Care",
+      "time": "11:00",
+      "title": "Appointment Approved ✅",
+      "message": "Your appointment for 11 December 2025 at 11:00 has been approved!",
+      "type": "appointment_approved",
+      "timestamp": 1765236254016,
+      "isRead": true
+    },
+    "CWT7tgJi1S1H0G3e9SIS": {
+      "date": "2 January 2026",
+      "createdAt": "2025-12-14 22:16:10",
+      "clientId": "KgQYffTKDkNFSi9B928xFnwlQWP2",
+      "clientName": "Unknown Client",
+      "appointmentId": "6b2713bb-d311-41bd-820b-d84046fb3dfb",
+      "service": "Chiropractic Care",
+      "time": "10:30",
+      "title": "Appointment Rejected ❌",
+      "message": "Your appointment for 2 January 2026 at 10:30 has been rejected.",
+      "type": "appointment_rejected",
+      "timestamp": 1765721770640,
+      "isRead": true
+    },
+    "TzEsFyIWu5KYnxRpgnzW": {
+      "date": "11 December 2025",
+      "createdAt": "2025-12-09 07:24:15",
+      "clientId": "7eCjMiqC04SYEn7QWjVJ0NvdHat1",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "f8b812d6-5a7a-4afe-b4fd-80eff1fa0179",
+      "service": "Chiropractic Care",
+      "time": "11:00",
+      "title": "Appointment Approved ✅",
+      "message": "Your appointment for 11 December 2025 at 11:00 has been approved!",
+      "type": "appointment_approved",
+      "timestamp": 1765236255450,
+      "isRead": true
+    },
+    "VOZb84TK11S7ZxT7hokE": {
+      "date": "9 December 2025",
+      "createdAt": "2025-12-09 07:35:43",
+      "clientId": "KgQYffTKDkNFSi9B928xFnwlQWP2",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "6040b46f-56dd-49cb-9b4d-ad838951e8c0",
+      "service": "Chiropractic Care",
+      "time": "10:30",
+      "title": "Appointment Approved ✅",
+      "message": "Your appointment for 9 December 2025 at 10:30 has been approved!",
+      "type": "appointment_approved",
+      "timestamp": 1765236943086,
+      "isRead": true
+    },
+    "aUvZ5VYT7vVmIWUGLPVV": {
+      "date": "21 December 2025",
+      "clientId": "sWEaG8LaBGXt4CAZXu3MXyjzckX2",
+      "clientName": "Jemaicy Codog",
+      "clientEmail": "jemaicycodog53@gmail.com",
+      "title": "New Appointment Booking",
+      "message": "New appointment booked by Jemaicy Codog for Chiropractic Care",
+      "type": "new_booking",
+      "clientPhone": "09638167129",
+      "createdAt": "2025-12-08 18:05:45",
+      "appointmentId": "5xkTxSXPNskukKzIyZT0",
+      "service": "Chiropractic Care",
+      "time": "07:05 PM",
+      "timestamp": 1765188345749,
+      "isRead": true
+    },
+    "cs6Azf5p1fToFHPRKxDu": {
+      "date": "10 December 2025",
+      "clientId": "sWEaG8LaBGXt4CAZXu3MXyjzckX2",
+      "clientName": "Jemaicy Codog",
+      "clientEmail": "jemaicycodog53@gmail.com",
+      "title": "New Appointment Booking",
+      "message": "New appointment booked by Jemaicy Codog for Chiropractic Care",
+      "type": "new_booking",
+      "clientPhone": "09638167129",
+      "createdAt": "2025-12-08 18:24:31",
+      "appointmentId": "EM4p6ToCEbLlcLMdKCEk",
+      "service": "Chiropractic Care",
+      "time": "06:24 PM",
+      "timestamp": 1765189471615,
+      "isRead": true
+    },
+    "dRD8B5vr8fJXbqg1BQqb": {
+      "date": "3 February 2026",
+      "createdAt": "2025-12-15 01:18:23",
+      "clientId": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "bb0850e3-7c9c-4aff-b3b8-1d245849b595",
+      "service": "Chiropractic Care",
+      "time": "10:30",
+      "title": "Appointment Approved ✅",
+      "message": "Your appointment for 3 February 2026 at 10:30 has been approved!",
+      "type": "appointment_approved",
+      "timestamp": 1765732703265,
+      "isRead": true
+    },
+    "eyEaZczsPjzuyg6AVZ2Z": {
+      "date": "2025-12-17",
+      "clientId": "sWEaG8LaBGXt4CAZXu3MXyjzckX2",
+      "clientName": "Jemaicy Codog",
+      "clientEmail": "jemaicycodog53@gmail.com",
+      "title": "Appointment Approved & Scheduled",
+      "message": "Appointment scheduled for Jemaicy Codog on 2025-12-17 at 02:30 AM",
+      "type": "appointment_approved",
+      "clientPhone": "09638167129",
+      "createdAt": "2025-12-09 02:56:14",
+      "appointmentId": "12c01444-0244-4538-a968-a41f949949bd",
+      "service": "Chiropractic Care",
+      "time": "02:30 AM",
+      "timestamp": 1765220174169,
+      "isRead": true
+    },
+    "fP36ZZudAu0t5RJF79nA": {
+      "date": "2025-12-26",
+      "clientId": "7eCjMiqC04SYEn7QWjVJ0NvdHat1",
+      "clientName": "Michael Joshua Taleon",
+      "clientEmail": "michaeljoshuataleon.edu@gmail.com",
+      "title": "New Appointment Booking",
+      "message": "New appointment booked by Michael Joshua Taleon for Chiropractic Care",
+      "type": "new_booking",
+      "clientPhone": "09053303821",
+      "createdAt": "2025-12-09 02:52:05",
+      "appointmentId": "d3be2e48-8468-4b63-be56-b13d1ebf9e10",
+      "service": "Chiropractic Care",
+      "time": "06:30 AM",
+      "timestamp": 1765219925330,
+      "isRead": true
+    },
+    "h46lljvVQdBzmxNjnkCJ": {
+      "date": "9 December 2025",
+      "createdAt": "2025-12-09 07:27:32",
+      "clientId": "KgQYffTKDkNFSi9B928xFnwlQWP2",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "38a918cd-f4e7-45c9-8f8f-f56d204c3f57",
+      "service": "Chiropractic Care",
+      "time": "10:00",
+      "title": "Appointment Approved ✅",
+      "message": "Your appointment for 9 December 2025 at 10:00 has been approved!",
+      "type": "appointment_approved",
+      "timestamp": 1765236452027,
+      "isRead": true
+    },
+    "i5kRCLWcOpgPAwsVP8hg": {
+      "date": "2026-04-01",
+      "clientId": "sWEaG8LaBGXt4CAZXu3MXyjzckX2",
+      "clientName": "Jemaicy Codog",
+      "clientEmail": "jemaicycodog53@gmail.com",
+      "title": "Appointment Approved & Scheduled",
+      "message": "Appointment scheduled for Jemaicy Codog on 2026-04-01 at 03:12 AM",
+      "type": "appointment_approved",
+      "clientPhone": "09638167129",
+      "createdAt": "2025-12-09 03:12:57",
+      "appointmentId": "1e0b1257-6d8f-4188-b442-107891c32342",
+      "service": "Chiropractic Care",
+      "time": "03:12 AM",
+      "timestamp": 1765221177402,
+      "isRead": true
+    },
+    "ruEwSAGetkgbf3T7f7Ca": {
+      "date": "15 December 2024",
+      "clientName": "Juan Dela Cruz",
+      "clientEmail": "juan@email.com",
+      "title": "New Appointment Booking",
+      "message": "New appointment booked by Juan Dela Cruz for Chiropractic Care",
+      "type": "new_booking",
+      "clientPhone": "+63 912 345 6789",
+      "createdAt": "2025-12-08 17:59:58",
+      "appointmentId": "test_appointment_001",
+      "service": "Chiropractic Care",
+      "time": "10:00 AM",
+      "timestamp": 1765187998364,
+      "isRead": true
+    },
+    "v1qelC9HtjRJr0PLa5Rn": {
+      "date": "9 December 2025",
+      "createdAt": "2025-12-09 07:28:02",
+      "clientId": "KgQYffTKDkNFSi9B928xFnwlQWP2",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "6cb768b7-0dfd-4717-b6e5-3131afa75cf3",
+      "service": "Chiropractic Care",
+      "time": "10:00",
+      "title": "Appointment Approved ✅",
+      "message": "Your appointment for 9 December 2025 at 10:00 has been approved!",
+      "type": "appointment_approved",
+      "timestamp": 1765236482267,
+      "isRead": true
+    },
+    "wLnjPGFfm92CpZQP8VHs": {
+      "date": "9 December 2025",
+      "createdAt": "2025-12-09 07:28:43",
+      "clientId": "KgQYffTKDkNFSi9B928xFnwlQWP2",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "462bb547-3443-4b35-a286-7959702dc542",
+      "service": "Chiropractic Care",
+      "time": "10:00",
+      "title": "Appointment Approved ✅",
+      "message": "Your appointment for 9 December 2025 at 10:00 has been approved!",
+      "type": "appointment_approved",
+      "timestamp": 1765236523161,
+      "isRead": true
+    },
+    "yA9soGR38UfYswSOEPkb": {
+      "date": "2026-04-24",
+      "clientId": "sWEaG8LaBGXt4CAZXu3MXyjzckX2",
+      "clientName": "Jemaicy Codog",
+      "clientEmail": "jemaicycodog53@gmail.com",
+      "title": "Appointment Approved & Scheduled",
+      "message": "Appointment scheduled for Jemaicy Codog on 2026-04-24 at 03:11 AM",
+      "type": "appointment_approved",
+      "clientPhone": "09638167129",
+      "createdAt": "2025-12-09 03:11:43",
+      "appointmentId": "a5f1afd3-7245-4700-b64a-5226322cb506",
+      "service": "Chiropractic Care",
+      "time": "03:11 AM",
+      "timestamp": 1765221103525,
+      "isRead": true
+    },
+    "ywuOLoCF65PmvLrScI1L": {
+      "date": "2025-12-11",
+      "clientId": "sWEaG8LaBGXt4CAZXu3MXyjzckX2",
+      "clientName": "Jemaicy Codog",
+      "clientEmail": "jemaicycodog53@gmail.com",
+      "title": "New Appointment Booking",
+      "message": "New appointment booked by Jemaicy Codog for Chiropractic Care",
+      "type": "new_booking",
+      "clientPhone": "09638167129",
+      "createdAt": "2025-12-09 02:47:22",
+      "appointmentId": "cc97f969-9ae7-4784-9e30-7fa87e2d919f",
+      "service": "Chiropractic Care",
+      "time": "02:47 AM",
+      "timestamp": 1765219642474,
+      "isRead": true
+    },
+    "zB74lw8tnYoyvGek9ETv": {
+      "date": "16 December 2025",
+      "createdAt": "2025-12-15 01:18:20",
+      "clientId": "DSpuLEUlMiZ5XfkflVD8kdE2RHY2",
+      "clientName": "Michael Joshua Taleon",
+      "appointmentId": "20c43f81-e473-498a-b723-e706c88adc41",
+      "service": "Chiropractic Care",
+      "time": "10:30",
+      "title": "Appointment Rejected ❌",
+      "message": "Your appointment for 16 December 2025 at 10:30 has been rejected.",
+      "type": "appointment_rejected",
+      "timestamp": 1765732700087,
+      "isRead": true
+    }
+  }
+}

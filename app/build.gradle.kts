@@ -67,6 +67,7 @@ android {
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
     implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-messaging")
     implementation("androidx.compose.material:material-icons-extended:1.7.4")
     implementation("androidx.navigation:navigation-compose:2.8.3")
     
@@ -102,8 +103,9 @@ dependencies {
     implementation("com.google.firebase:firebase-functions-ktx:20.4.0")
     implementation("com.google.firebase:firebase-storage-ktx:21.0.1")
     
-    // Image loading
+    // Image loading and processing
     implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 
     // Credential API / Google Sign-In
     implementation(libs.androidx.credentials)

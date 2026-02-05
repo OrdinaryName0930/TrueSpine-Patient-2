@@ -529,11 +529,11 @@ class MessagingRepository @Inject constructor(
                 .get()
                 .await()
 
-            val chiropractor = chiropractorDoc.toObject<Chiropractor>()
-            val phoneNumber = chiropractor?.phoneNumber
+            // Get contactNumber from Firestore document directly
+            val contactNumber = chiropractorDoc.getString("contactNumber")
 
-            if (phoneNumber != null && phoneNumber.isNotEmpty()) {
-                Result.success(phoneNumber)
+            if (contactNumber != null && contactNumber.isNotEmpty()) {
+                Result.success(contactNumber)
             } else {
                 Result.failure(Exception("Phone number not available"))
             }

@@ -1,5 +1,6 @@
 package com.brightcare.patient.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -68,6 +69,7 @@ fun BookAppointmentActivity(
     var isLoadingChiropractor by remember { mutableStateOf(true) }
     var chiropractorError by remember { mutableStateOf<String?>(null) }
     var chiropractorUnavailability by remember { mutableStateOf<ChiropractorUnavailability?>(null) }
+    var patientCount by remember { mutableStateOf(0) }
     
     // Fetch chiropractor data from Firestore
     LaunchedEffect(chiropractorId) {
@@ -99,6 +101,10 @@ fun BookAppointmentActivity(
                         if (suffix.isNotBlank()) append(" $suffix")
                     }.trim().ifBlank { data["name"] as? String ?: "Unknown Doctor" }
                     
+                    // Get real rating and review count from Firestore
+                    val realRating = (data["rating"] as? Double) ?: 0.0
+                    val realReviewCount = (data["reviewCount"] as? Long)?.toInt() ?: 0
+                    
                     chiropractor = Chiropractor(
                         id = document.id,
                         name = fullName,
@@ -108,10 +114,10 @@ fun BookAppointmentActivity(
                         specialization = data["specialization"] as? String ?: "General Practice",
                         licenseNumber = data["prcLicenseNumber"] as? String ?: "",
                         experience = (data["yearsOfExperience"] as? Long)?.toInt() ?: 0,
-                        rating = 4.8, // Default rating as it's not in the structure
-                        reviewCount = 150, // Default review count
+                        rating = realRating, // Real rating from reviews
+                        reviewCount = realReviewCount, // Real review count from reviews
                         isAvailable = true, // Default to available
-                        location = "Philippines", // Default location
+                        location = "", // No default location - will be hidden if empty
                         bio = data["about"] as? String ?: "",
                         serviceHours = data["serviceHours"] as? String // Get service hours from Firestore
                     )
@@ -160,6 +166,35 @@ fun BookAppointmentActivity(
         }
     }
     
+    // Load patient count for the chiropractor
+    LaunchedEffect(chiropractorId) {
+        try {
+            android.util.Log.d("BookAppointmentActivity", "Fetching patient count for chiropractor: $chiropractorId")
+            
+            val firestore = FirebaseFirestore.getInstance()
+            val querySnapshot = firestore.collection("appointment")
+                .whereEqualTo("chiroId", chiropractorId)
+                .get()
+                .await()
+            
+            val uniqueClientIds = querySnapshot.documents.mapNotNull { document ->
+                try {
+                    document.getString("clientId")
+                } catch (e: Exception) {
+                    android.util.Log.w("BookAppointmentActivity", "Error parsing clientId from appointment: ${document.id}", e)
+                    null
+                }
+            }.toSet()
+            
+            patientCount = uniqueClientIds.size
+            android.util.Log.d("BookAppointmentActivity", "Found $patientCount unique patients for chiropractor: $chiropractorId")
+            
+        } catch (e: Exception) {
+            android.util.Log.e("BookAppointmentActivity", "Error fetching patient count", e)
+            patientCount = 0 // Default to 0 on error
+        }
+    }
+    
     // Get current date for validation
     val currentCalendar = Calendar.getInstance()
     val currentYear = currentCalendar.get(Calendar.YEAR)
@@ -170,6 +205,7 @@ fun BookAppointmentActivity(
     var selectedDay by remember { mutableStateOf<Int?>(null) }
     var selectedTime by remember { mutableStateOf("") }
     var appointmentMessage by remember { mutableStateOf("")}
+    var selectedPaymentOption by remember { mutableStateOf("downpayment") } // "full" or "downpayment"
     val currentMonth = currentCalendar.get(Calendar.MONTH) + 1 // Calendar.MONTH is 0-based
     val currentDay = currentCalendar.get(Calendar.DAY_OF_MONTH)
     
@@ -185,8 +221,14 @@ fun BookAppointmentActivity(
         }
     }
     
+    // Get user's booked dates to prevent double booking
+    val userBookedDates by viewModel.userBookedDates.collectAsStateWithLifecycle()
+    
+    // Get doctor's booked times for the selected date
+    val doctorBookedTimes by viewModel.doctorBookedTimes.collectAsStateWithLifecycle()
+    
     // Available days with day names based on selected year and month
-    val availableDays = remember(selectedYear, selectedMonth, chiropractorUnavailability) {
+    val availableDays = remember(selectedYear, selectedMonth, chiropractorUnavailability, userBookedDates) {
         if (selectedYear != null && selectedMonth != null) {
             val calendar = Calendar.getInstance()
             calendar.set(selectedYear!!, selectedMonth!! - 1, 1) // Calendar.MONTH is 0-based
@@ -202,10 +244,17 @@ fun BookAppointmentActivity(
             (startDay..maxDays).map { day ->
                 calendar.set(Calendar.DAY_OF_MONTH, day)
                 val dateString = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(calendar.time)
-                val isAvailable = chiropractorUnavailability?.isDateFullyUnavailable(dateString) != true
+                val isChiropractorAvailable = chiropractorUnavailability?.isDateFullyUnavailable(dateString) != true
+                val isNotAlreadyBooked = !userBookedDates.contains(dateString)
+                val isSunday = calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+                val isAvailable = isChiropractorAvailable && isNotAlreadyBooked && !isSunday
                 
                 // Debug logging for date availability
-                android.util.Log.d("BookAppointmentActivity", "Checking date: $dateString, isFullyUnavailable: ${chiropractorUnavailability?.isDateFullyUnavailable(dateString)}, isAvailable: $isAvailable")
+                android.util.Log.d("BookAppointmentActivity", "Checking date: $dateString, " +
+                    "isChiropractorAvailable: $isChiropractorAvailable, " +
+                    "isNotAlreadyBooked: $isNotAlreadyBooked, " +
+                    "isSunday: $isSunday, " +
+                    "isAvailable: $isAvailable")
                 
                 DayInfo(
                     dayNumber = day,
@@ -220,7 +269,7 @@ fun BookAppointmentActivity(
     }
     
     // Available time slots based on chiropractor's schedule and unavailability
-    val availableTimeSlots = remember(chiropractor, selectedYear, selectedMonth, selectedDay, chiropractorUnavailability) {
+    val availableTimeSlots = remember(chiropractor, selectedYear, selectedMonth, selectedDay, chiropractorUnavailability, doctorBookedTimes) {
         val baseTimeSlots = chiropractor?.let { chiro ->
             parseChiropractorSchedule(chiro.serviceHours)
         } ?: generateDefault30MinuteTimeSlots()
@@ -244,26 +293,49 @@ fun BookAppointmentActivity(
                 }
             } else {
                 // Mark specific time slots as unavailable
-                baseTimeSlots.map { timeSlot ->
+                baseTimeSlots.mapNotNull { timeSlot ->
                     val time24Hour = convertTo24HourFormat(timeSlot)
                     val isTimeUnavailable = unavailability.isTimeUnavailable(dateString, time24Hour)
-                    TimeSlot(
-                        time = timeSlot,
-                        isAvailable = !isTimeUnavailable,
-                        isBooked = false,
-                        duration = 30
-                    )
+                    val isPastTime = isTimeSlotInPast(timeSlot, calendar.time)
+                    val isDoctorBooked = doctorBookedTimes.contains(timeSlot)
+                    
+                    // Remove time slots that are booked by other patients
+                    if (isDoctorBooked) {
+                        null // Remove this time slot completely
+                    } else {
+                        TimeSlot(
+                            time = timeSlot,
+                            isAvailable = !isTimeUnavailable && !isPastTime,
+                            isBooked = false,
+                            duration = 30
+                        )
+                    }
                 }
             }
         } else {
             // Convert to TimeSlot objects (all available by default)
-            baseTimeSlots.map { timeSlot ->
-                TimeSlot(
-                    time = timeSlot,
-                    isAvailable = true,
-                    isBooked = false,
-                    duration = 30
-                )
+            baseTimeSlots.mapNotNull { timeSlot ->
+                val selectedDate = if (selectedYear != null && selectedMonth != null && selectedDay != null) {
+                    Calendar.getInstance().apply {
+                        set(selectedYear!!, selectedMonth!! - 1, selectedDay!!)
+                    }.time
+                } else {
+                    Date() // Use current date as fallback
+                }
+                val isPastTime = isTimeSlotInPast(timeSlot, selectedDate)
+                val isDoctorBooked = doctorBookedTimes.contains(timeSlot)
+                
+                // Remove time slots that are booked by other patients
+                if (isDoctorBooked) {
+                    null // Remove this time slot completely
+                } else {
+                    TimeSlot(
+                        time = timeSlot,
+                        isAvailable = !isPastTime,
+                        isBooked = false,
+                        duration = 30
+                    )
+                }
             }
         }
     }
@@ -283,6 +355,14 @@ fun BookAppointmentActivity(
     LaunchedEffect(chiropractor) {
         chiropractor?.let { chiro ->
             viewModel.setSelectedChiropractor(chiro)
+        }
+    }
+    
+    // Load doctor booked times when date is selected
+    LaunchedEffect(finalSelectedDate, chiropractor) {
+        val currentChiropractor = chiropractor
+        if (finalSelectedDate != null && currentChiropractor != null) {
+            viewModel.loadDoctorBookedTimes(currentChiropractor.id, finalSelectedDate)
         }
     }
     
@@ -474,7 +554,7 @@ fun BookAppointmentActivity(
                     ) {
                         StatisticItem(
                             icon = Icons.Default.People,
-                            value = "7,500+",
+                            value = if (patientCount > 0) "$patientCount" else "0",
                             label = "Patients",
                             iconColor = Blue500
                         )
@@ -499,6 +579,291 @@ fun BookAppointmentActivity(
                             label = "Review",
                             iconColor = Blue500
                         )
+                    }
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Session Fee Information Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = White),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp)
+            ) {
+                // Session Fee Title
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Payment,
+                        contentDescription = "Session Fee",
+                        tint = Blue500,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Session Fee Information",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Blue500
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Full Session Fee
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Full Session Fee",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Gray900,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "Complete chiropractic session",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Gray600
+                        )
+                    }
+                    
+                    Row(
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = "₱",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Blue500,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "3,499.00",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Blue500,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Divider
+                androidx.compose.material3.HorizontalDivider(
+                    color = Gray200,
+                    thickness = 1.dp
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Downpayment Fee
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Downpayment Required",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Gray900,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "To secure your appointment",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Gray600
+                        )
+                    }
+                    
+                    Row(
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = "₱",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Orange500,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "699.00",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Orange500,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Payment Options Selection
+                Column {
+                    Text(
+                        text = "Choose Payment Option",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Gray900
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Full Payment Option
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedPaymentOption = "full" },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (selectedPaymentOption == "full") Blue50 else Gray50
+                        ),
+                        border = BorderStroke(
+                            width = 2.dp,
+                            color = if (selectedPaymentOption == "full") Blue500 else Gray200
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedPaymentOption == "full",
+                                onClick = { selectedPaymentOption = "full" },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = Blue500,
+                                    unselectedColor = Gray400
+                                )
+                            )
+                            
+                            Spacer(modifier = Modifier.width(12.dp))
+                            
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Full Payment",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (selectedPaymentOption == "full") Blue700 else Gray900
+                                )
+                                Text(
+                                    text = "Pay complete amount now",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (selectedPaymentOption == "full") Blue600 else Gray600
+                                )
+                            }
+                            
+                            Text(
+                                text = "₱3,499.00",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (selectedPaymentOption == "full") Blue500 else Gray700
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Downpayment Option
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedPaymentOption = "downpayment" },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (selectedPaymentOption == "downpayment") Orange50 else Gray50
+                        ),
+                        border = BorderStroke(
+                            width = 2.dp,
+                            color = if (selectedPaymentOption == "downpayment") Orange500 else Gray200
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedPaymentOption == "downpayment",
+                                onClick = { selectedPaymentOption = "downpayment" },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = Orange500,
+                                    unselectedColor = Gray400
+                                )
+                            )
+                            
+                            Spacer(modifier = Modifier.width(12.dp))
+                            
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Downpayment",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (selectedPaymentOption == "downpayment") Orange700 else Gray900
+                                )
+                                Text(
+                                    text = "Pay remaining ₱2,800.00 during session",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (selectedPaymentOption == "downpayment") Orange600 else Gray600
+                                )
+                            }
+                            
+                            Text(
+                                text = "₱699.00",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (selectedPaymentOption == "downpayment") Orange500 else Gray700
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Payment Information Note
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (selectedPaymentOption == "full") Blue50 else Orange50
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Information",
+                            tint = if (selectedPaymentOption == "full") Blue500 else Orange500,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = if (selectedPaymentOption == "full") "Full Payment Selected" else "Downpayment Selected",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (selectedPaymentOption == "full") Blue700 else Orange700,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (selectedPaymentOption == "full") 
+                                    "You will pay ₱3,499.00 now to complete your booking. No additional payment required during your session." 
+                                else 
+                                    "You will pay ₱699.00 now to secure your slot. Remaining balance (₱2,800.00) is payable before or during your session.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (selectedPaymentOption == "full") Blue600 else Orange600
+                            )
+                        }
                     }
                 }
             }
@@ -685,7 +1050,12 @@ fun BookAppointmentActivity(
         
         OutlinedTextField(
             value = appointmentMessage,
-            onValueChange = { appointmentMessage = it },
+            onValueChange = { newMessage ->
+                // Limit to 300 characters
+                if (newMessage.length <= 300) {
+                    appointmentMessage = newMessage
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
@@ -702,7 +1072,15 @@ fun BookAppointmentActivity(
                 unfocusedBorderColor = Gray300,
                 focusedLabelColor = Blue500
             ),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            supportingText = {
+                val remainingChars = 300 - appointmentMessage.length
+                Text(
+                    text = "${appointmentMessage.length}/300 characters • $remainingChars characters remaining",
+                    color = if (remainingChars <= 20) Color.Red else Gray600,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         )
         
         Spacer(modifier = Modifier.height(32.dp))
@@ -712,22 +1090,31 @@ fun BookAppointmentActivity(
             android.util.Log.d("BookAppointmentActivity", "Button state - finalSelectedDate: $finalSelectedDate, selectedTime: '$selectedTime', isSaving: ${uiState.isSaving}")
         }
         
-        // Make Appointment Button (only show if chiropractor data is loaded)
+        // Proceed to Payment Button (only show if chiropractor data is loaded)
         if (chiropractor != null && !isLoadingChiropractor && chiropractorError == null) {
             Button(
                 onClick = {
                     if (finalSelectedDate != null && selectedTime.isNotEmpty()) {
-                        // Handle appointment booking
-                        viewModel.updateFormState(
-                            uiState.formState.copy(
-                                selectedChiropractorId = chiropractorId,
-                                selectedDate = finalSelectedDate,
-                                selectedTime = selectedTime,
-                                symptoms = if (appointmentMessage.isNotBlank()) appointmentMessage else "General consultation",
-                                notes = appointmentMessage
-                            )
+                        // Format date as yyyy-MM-dd for navigation
+                        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        val formattedDate = dateFormat.format(finalSelectedDate)
+                        
+                        android.util.Log.d("BookAppointmentActivity", "Navigating to payment with:")
+                        android.util.Log.d("BookAppointmentActivity", "ChiropractorId: $chiropractorId")
+                        android.util.Log.d("BookAppointmentActivity", "Date: $formattedDate")
+                        android.util.Log.d("BookAppointmentActivity", "Time: $selectedTime")
+                        android.util.Log.d("BookAppointmentActivity", "Payment Option: $selectedPaymentOption")
+                        android.util.Log.d("BookAppointmentActivity", "Message: $appointmentMessage")
+                        
+                        // Navigate to payment with all appointment data
+                        val paymentRoute = com.brightcare.patient.navigation.NavigationRoutes.payment(
+                            chiropractorId = chiropractorId,
+                            date = formattedDate,
+                            time = selectedTime,
+                            paymentOption = selectedPaymentOption,
+                            message = appointmentMessage.ifBlank { "General consultation" }
                         )
-                        viewModel.bookAppointment()
+                        navController.navigate(paymentRoute)
                     }
                 },
                 modifier = Modifier
@@ -739,18 +1126,23 @@ fun BookAppointmentActivity(
                     disabledContainerColor = Gray300
                 ),
                 shape = RoundedCornerShape(16.dp),
-                enabled = finalSelectedDate != null && selectedTime.isNotEmpty() && !uiState.isSaving
+                enabled = finalSelectedDate != null && selectedTime.isNotEmpty()
             ) {
-                if (uiState.isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = White
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Payment,
+                        contentDescription = "Proceed to Payment",
+                        tint = White,
+                        modifier = Modifier.size(20.dp)
                     )
-                } else {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val paymentAmount = if (selectedPaymentOption == "full") "₱3,499.00" else "₱699.00"
                     Text(
-                        text = "Make Appointment",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        text = "Proceed to Payment - $paymentAmount",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
                         color = White
                     )
                 }
@@ -1210,6 +1602,60 @@ private fun generateDefault30MinuteTimeSlots(): List<String> {
     }
     
     return timeSlots
+}
+
+/**
+ * Check if a time slot is in the past for the given date
+ * I-check kung nakaraan na ang time slot para sa given date
+ */
+private fun isTimeSlotInPast(timeSlot: String, selectedDate: Date): Boolean {
+    return try {
+        val currentDate = Calendar.getInstance()
+        val selectedCalendar = Calendar.getInstance().apply { time = selectedDate }
+        
+        // Only filter past times if the selected date is today
+        if (!isSameDay(currentDate, selectedCalendar)) {
+            return false
+        }
+        
+        // Convert time slot to 24-hour format for comparison
+        val time24Hour = convertTo24HourFormat(timeSlot)
+        val timeParts = time24Hour.split(":")
+        if (timeParts.size != 2) return false
+        
+        val slotHour = timeParts[0].toInt()
+        val slotMinute = timeParts[1].toInt()
+        
+        // Create calendar for the time slot
+        val slotCalendar = Calendar.getInstance().apply {
+            time = selectedDate
+            set(Calendar.HOUR_OF_DAY, slotHour)
+            set(Calendar.MINUTE, slotMinute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        
+        // Check if the slot time has passed
+        val isPast = slotCalendar.before(currentDate)
+        
+        if (isPast) {
+            android.util.Log.d("BookAppointmentActivity", "Time slot $timeSlot is in the past for today")
+        }
+        
+        isPast
+    } catch (e: Exception) {
+        android.util.Log.w("BookAppointmentActivity", "Error checking if time slot is in past: $timeSlot", e)
+        false // If error occurs, don't filter the slot
+    }
+}
+
+/**
+ * Check if two calendars represent the same day
+ * I-check kung pareho ang araw ng dalawang calendar
+ */
+private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
+    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+           cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
 }
 
 @Preview(showBackground = true)

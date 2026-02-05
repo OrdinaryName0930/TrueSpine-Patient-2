@@ -4,6 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +32,7 @@ import com.brightcare.patient.ui.component.chirocomponents.*
  * Screen para sa pakikipag-chat sa mga healthcare provider
  * Following ChiroScreen structure with integrated search functionality
  */
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun MessageScreen(
     navController: NavController,
@@ -39,24 +44,45 @@ fun MessageScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val displayChiropractors by viewModel.getDisplayChiropractors().collectAsStateWithLifecycle()
 
-    Column(
+    // Pull to refresh state
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.refreshData()
+        }
+    )
+
+    // Handle refresh completion
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && isRefreshing) {
+            isRefreshing = false
+        }
+    }
+
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(WhiteBg)
-            .padding(
-                start = 12.dp,
-                top = 16.dp,
-                end = 12.dp
-            )
+            .pullRefresh(pullRefreshState)
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    start = 12.dp,
+                    top = 16.dp,
+                    end = 12.dp
+                )
+        ) {
         // Header (following ChiroScreen pattern)
         ChiroHeader(
             title = "Messages",
             subtitle = "Chat with chiropractors",
             onSearchClick = { 
-                // Focus on search - could expand search functionality here
-                // For now, just refresh the data
-                viewModel.refreshData()
+                // No refresh functionality - just focus on search
+                // Pull to refresh is now the main refresh method
             }
         )
 
@@ -163,6 +189,16 @@ fun MessageScreen(
                 )
             }
         }
+        }
+
+        // Pull refresh indicator
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            backgroundColor = White,
+            contentColor = Blue500
+        )
     }
 }
 

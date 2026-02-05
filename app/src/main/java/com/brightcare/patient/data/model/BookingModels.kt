@@ -19,6 +19,11 @@ data class Appointment(
     val createdAt: Long = System.currentTimeMillis() / 1000, // Unix timestamp in seconds
     val whoBooked: String = "client", // client | chiro | admin
     val bookedByUid: String = "", // UID of who booked the appointment
+    val paymentOption: String = "", // "full" or "downpayment"
+    val paymentProofUri: String = "", // URI of uploaded payment proof
+    val lastUpdated: Long = 0, // Unix timestamp in seconds
+    val isReviewed: Boolean = false, // Track if appointment has been reviewed
+    val reviewId: String = "", // ID of the review if reviewed
     
     // Legacy fields for backward compatibility (can be removed later)
     @Deprecated("Use chiroId instead")
@@ -51,7 +56,12 @@ data class Appointment(
         message = "",
         createdAt = System.currentTimeMillis() / 1000,
         whoBooked = "client",
-        bookedByUid = ""
+        bookedByUid = "",
+        paymentOption = "",
+        paymentProofUri = "",
+        lastUpdated = 0,
+        isReviewed = false,
+        reviewId = ""
     )
 
     /**
@@ -68,7 +78,12 @@ data class Appointment(
             "message" to message,
             "createdAt" to createdAt,
             "whoBooked" to whoBooked,
-            "bookedByUid" to bookedByUid
+            "bookedByUid" to bookedByUid,
+            "paymentOption" to paymentOption,
+            "paymentProofUri" to paymentProofUri,
+            "lastUpdated" to lastUpdated,
+            "isReviewed" to isReviewed,
+            "reviewId" to reviewId
         )
     }
 
@@ -89,6 +104,11 @@ data class Appointment(
                 createdAt = (data["createdAt"] as? Long) ?: (System.currentTimeMillis() / 1000),
                 whoBooked = data["whoBooked"] as? String ?: "client",
                 bookedByUid = data["bookedByUid"] as? String ?: "",
+                paymentOption = data["paymentOption"] as? String ?: "",
+                paymentProofUri = data["paymentProofUri"] as? String ?: "",
+                lastUpdated = (data["lastUpdated"] as? Long) ?: 0,
+                isReviewed = data["isReviewed"] as? Boolean ?: false,
+                reviewId = data["reviewId"] as? String ?: "",
                 
                 // Legacy fields for backward compatibility
                 patientId = data["patientId"] as? String ?: data["clientId"] as? String ?: "",
@@ -184,6 +204,8 @@ data class BookingFormState(
     val symptoms: String = "",
     val notes: String = "",
     val isFirstVisit: Boolean = true,
+    val paymentOption: String = "downpayment", // "full" or "downpayment"
+    val paymentProofUri: String = "", // URI of uploaded payment proof image
     
     // Validation states
     val isDateError: Boolean = false,
@@ -330,4 +352,57 @@ data class BookingUiState(
     val successMessage: String? = null,
     val showProfileIncompleteDialog: Boolean = false
 )
+
+/**
+ * Review data model for chiropractor reviews
+ * Model ng review para sa chiropractor
+ */
+data class Review(
+    val id: String = "",
+    val appointmentId: String = "",
+    val chiropractorId: String = "",
+    val clientId: String = "",
+    val clientName: String = "",
+    val rating: Int = 0, // 1-5 stars
+    val comment: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+    val isAnonymous: Boolean = false
+) {
+    /**
+     * Convert to map for Firestore storage
+     * I-convert sa map para sa Firestore storage
+     */
+    fun toMap(): Map<String, Any?> {
+        return mapOf(
+            "appointmentId" to appointmentId,
+            "chiropractorId" to chiropractorId,
+            "clientId" to clientId,
+            "clientName" to clientName,
+            "rating" to rating,
+            "comment" to comment,
+            "createdAt" to createdAt,
+            "isAnonymous" to isAnonymous
+        )
+    }
+
+    companion object {
+        /**
+         * Create from Firestore document data
+         * Gumawa mula sa Firestore document data
+         */
+        fun fromMap(id: String, data: Map<String, Any>): Review {
+            return Review(
+                id = id,
+                appointmentId = data["appointmentId"] as? String ?: "",
+                chiropractorId = data["chiropractorId"] as? String ?: "",
+                clientId = data["clientId"] as? String ?: "",
+                clientName = data["clientName"] as? String ?: "",
+                rating = (data["rating"] as? Long)?.toInt() ?: 0,
+                comment = data["comment"] as? String ?: "",
+                createdAt = data["createdAt"] as? Long ?: System.currentTimeMillis(),
+                isAnonymous = data["isAnonymous"] as? Boolean ?: false
+            )
+        }
+    }
+}
 

@@ -6,6 +6,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -67,7 +70,7 @@ data class ProfileMenuItem(
 /**
  * Profile screen - Manage account and settings
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.material.ExperimentalMaterialApi::class)
 @Composable
 fun ProfileScreen(
     navController: NavController,
@@ -81,6 +84,17 @@ fun ProfileScreen(
     val profileUiState by profileViewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberToastState()
     
+    // Pull-to-refresh state
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            profileViewModel.loadExistingProfile()
+            authViewModel.refreshProfileData()
+        }
+    )
+    
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showProfilePictureDialog by remember { mutableStateOf(false) }
     var showConfirmationDialog by remember { mutableStateOf(false) }
@@ -91,7 +105,9 @@ fun ProfileScreen(
     val userName by authViewModel.currentUserName.collectAsState()
     val userEmail by authViewModel.currentUserEmail.collectAsState()
     val firstName by authViewModel.firstName.collectAsState()
+    val middleName by authViewModel.middleName.collectAsState()
     val lastName by authViewModel.lastName.collectAsState()
+    val suffix by authViewModel.suffix.collectAsState()
     val loginTimestamp = authViewModel.getLoginTimestamp()
     
     // Load profile data when screen is first displayed
@@ -166,10 +182,22 @@ fun ProfileScreen(
         }
     }
     
-    // Combine first and last name for display
-    val displayName: String = remember(firstName, lastName, userName) {
+    // Combine all name parts for display
+    // I-combine ang lahat ng bahagi ng pangalan para sa display
+    val displayName: String = remember(firstName, middleName, lastName, suffix, userName) {
         when {
-            !firstName.isNullOrBlank() && !lastName.isNullOrBlank() -> "$firstName $lastName"
+            !firstName.isNullOrBlank() && !lastName.isNullOrBlank() -> {
+                buildString {
+                    append(firstName)
+                    if (!middleName.isNullOrBlank()) {
+                        append(" $middleName")
+                    }
+                    append(" $lastName")
+                    if (!suffix.isNullOrBlank()) {
+                        append(" $suffix")
+                    }
+                }
+            }
             !userName.isNullOrBlank() -> userName ?: "User Name"
             else -> "User Name"
         }
@@ -178,6 +206,13 @@ fun ProfileScreen(
     // Refresh profile data when screen is displayed
     LaunchedEffect(Unit) {
         authViewModel.refreshProfileData()
+    }
+    
+    // Handle refresh state - stop refreshing when data is loaded or error occurs
+    LaunchedEffect(profileUiState.isLoading, profileUiState.errorMessage) {
+        if (!profileUiState.isLoading) {
+            isRefreshing = false
+        }
     }
     
     // Format member since date
@@ -190,12 +225,17 @@ fun ProfileScreen(
         }
     }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(WhiteBg)
-            .verticalScroll(scrollState)
+            .pullRefresh(pullRefreshState)
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+        ) {
         // Header with user info
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -365,7 +405,7 @@ fun ProfileScreen(
             
             // App version info
             Text(
-                text = "BrightCare Patient v1.0.0",
+                text = "",
                 style = MaterialTheme.typography.bodySmall.copy(
                     color = Gray500
                 ),
@@ -375,6 +415,14 @@ fun ProfileScreen(
             
             Spacer(modifier = Modifier.height(80.dp)) // Bottom padding for navigation
         }
+        }
+        
+        // Pull refresh indicator
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
     
     // Logout confirmation dialog

@@ -44,12 +44,11 @@ data class Notification(
     )
 
     /**
-     * Convert to map for Firestore
-     * I-convert sa map para sa Firestore
+     * Convert to map for Firestore (matching TrueSpine8.json structure)
+     * I-convert sa map para sa Firestore (tumugma sa TrueSpine8.json structure)
      */
     fun toMap(): Map<String, Any> {
         return mapOf(
-            "id" to id,
             "clientId" to clientId,
             "clientName" to clientName,
             "clientEmail" to clientEmail,
@@ -102,6 +101,8 @@ enum class NotificationType(val value: String, val displayName: String) {
     GENERAL("general", "General"),
     NEW_BOOKING("new_booking", "New Booking"),
     APPOINTMENT_CONFIRMED("appointment_confirmed", "Appointment Confirmed"),
+    APPOINTMENT_APPROVED("appointment_approved", "Appointment Approved"),
+    APPOINTMENT_REJECTED("appointment_rejected", "Appointment Rejected"),
     APPOINTMENT_CANCELLED("appointment_cancelled", "Appointment Cancelled"),
     APPOINTMENT_REMINDER("appointment_reminder", "Appointment Reminder"),
     MESSAGE_RECEIVED("message_received", "New Message"),
@@ -124,6 +125,13 @@ data class NotificationUiState(
     val errorMessage: String? = null,
     val unreadCount: Int = 0
 )
+
+
+
+
+
+
+
 
 
 

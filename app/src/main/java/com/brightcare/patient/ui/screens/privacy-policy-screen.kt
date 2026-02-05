@@ -82,9 +82,10 @@ fun PrivacyPolicyScreen(
                     
                     Text(
                         text = "Privacy Policy",
-                        style = MaterialTheme.typography.headlineSmall.copy(
+                        style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = Blue500
+                            color = Blue500,
+                            fontSize = 28.sp
                         )
                     )
                 }
@@ -195,7 +196,7 @@ fun PrivacyPolicyScreen(
             item {
                 PrivacySection(
                     title = "9. Contact Us",
-                    content = "If you have any questions about this Privacy Policy or our privacy practices, please contact us at:\n\nEmail: privacy@brightcare.com\nPhone: +63 9123-456-789\nAddress: 123 Healthcare Ave, Medical District, Metro Manila, 1600\n\nPrivacy Officer: Dr. Maria Santos\nEmail: privacy.officer@brightcare.com"
+                    content = "If you have any questions about this Privacy Policy or our privacy practices, please contact us at:\n\nEmail: privacy@brightcare.com\nPhone: +63 9123-456-789\nAddress: 123 Healthcare Ave, Medical District, Metro Manila, 1600"
                 )
             }
         }

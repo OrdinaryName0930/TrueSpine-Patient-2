@@ -34,6 +34,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.rememberAsyncImagePainter
 import com.brightcare.patient.ui.theme.*
+import com.brightcare.patient.utils.ImageCompressionUtils
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -57,6 +58,12 @@ fun IdUploadComponent(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    
+    // Clean up old temporary files on component initialization
+    // Linisin ang mga lumang temporary files sa component initialization
+    LaunchedEffect(Unit) {
+        ImageCompressionUtils.cleanupTempFiles(context)
+    }
     
     // Camera permission launcher
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -165,7 +172,7 @@ fun IdUploadComponent(
         )
         
         Text(
-            text = "Please upload clear photos of the front and back of your valid ID for verification purposes.",
+            text = "Please upload clear photos of the front and back of your valid ID for verification purposes. Images will be automatically optimized for faster upload while maintaining quality.",
             style = MaterialTheme.typography.bodySmall.copy(
                 color = Gray600,
                 lineHeight = 20.sp

@@ -31,7 +31,11 @@ fun ConversationCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val timeText = formatConversationTime(conversation.lastMessageTime)
+    val timeText = if (conversation.lastMessage == "Tap to start conversation") {
+        "" // Don't show time for new conversations
+    } else {
+        formatConversationTime(conversation.lastMessageTime)
+    }
 
     Card(
         onClick = onClick,
@@ -130,17 +134,8 @@ fun ConversationAvatar(
             }
         }
         
-        // Online indicator
-        if (isOnline) {
-            Surface(
-                modifier = Modifier
-                    .size(14.dp)
-                    .align(Alignment.BottomEnd),
-                shape = CircleShape,
-                color = Success,
-                border = androidx.compose.foundation.BorderStroke(2.dp, White)
-            ) {}
-        }
+        // Online indicator removed per user request
+        // Green circle removed - no longer showing online status
         
         // New message indicator (red dot)
         if (hasNewMessage) {

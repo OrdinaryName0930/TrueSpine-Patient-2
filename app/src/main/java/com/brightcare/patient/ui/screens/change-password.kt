@@ -7,6 +7,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Visibility
@@ -158,6 +160,9 @@ fun ChangePasswordScreen(
                 // -------------------------------
                 // CURRENT PASSWORD (NO VALIDATION)
                 // -------------------------------
+                val currentPasswordInteractionSource = remember { MutableInteractionSource() }
+                val isCurrentPasswordFocused by currentPasswordInteractionSource.collectIsFocusedAsState()
+                
                 OutlinedTextField(
                 value = currentPassword,
                 onValueChange = {
@@ -167,7 +172,8 @@ fun ChangePasswordScreen(
                 label = { Text("Current Password") },
                 visualTransformation = if (currentPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
-                    val tint = if (!hasInteractedCurrent || currentPassword.isEmpty()) Gray400 else Blue500
+                    // Match eye icon color to border color
+                    val tint = if (isCurrentPasswordFocused) Blue500 else Gray300
                     IconButton(onClick = { currentPasswordVisible = !currentPasswordVisible }) {
                         Icon(
                             imageVector = if (currentPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
@@ -184,12 +190,17 @@ fun ChangePasswordScreen(
                     unfocusedBorderColor = Gray300
                 ),
                 isError = false,
-                supportingText = null
+                supportingText = null,
+                interactionSource = currentPasswordInteractionSource
             )
 
             // -------------------------------
             // NEW PASSWORD
             // -------------------------------
+            val newPasswordInteractionSource = remember { MutableInteractionSource() }
+            val isNewPasswordFocused by newPasswordInteractionSource.collectIsFocusedAsState()
+            val isNewPasswordError = hasInteractedNew && newPassword.isNotEmpty() && !isNewPasswordValid
+            
             OutlinedTextField(
                 value = newPassword,
                 onValueChange = {
@@ -199,7 +210,12 @@ fun ChangePasswordScreen(
                 label = { Text("New Password") },
                 visualTransformation = if (newPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
-                    val tint = if (!hasInteractedNew || newPassword.isEmpty()) Gray400 else Blue500
+                    // Match eye icon color to border color
+                    val tint = when {
+                        isNewPasswordError -> Error
+                        isNewPasswordFocused -> Blue500
+                        else -> Gray300
+                    }
                     IconButton(onClick = { newPasswordVisible = !newPasswordVisible }) {
                         Icon(
                             imageVector = if (newPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
@@ -215,9 +231,9 @@ fun ChangePasswordScreen(
                     focusedBorderColor = Blue500,
                     unfocusedBorderColor = Gray300
                 ),
-                isError = hasInteractedNew && newPassword.isNotEmpty() && !isNewPasswordValid,
+                isError = isNewPasswordError,
                 supportingText =
-                    if (hasInteractedNew && newPassword.isNotEmpty() && !isNewPasswordValid) {
+                    if (isNewPasswordError) {
                         {
                             Text(
                                 text = when {
@@ -230,12 +246,17 @@ fun ChangePasswordScreen(
                                 color = Error
                             )
                         }
-                    } else null
+                    } else null,
+                interactionSource = newPasswordInteractionSource
             )
 
             // -------------------------------
             // CONFIRM PASSWORD
             // -------------------------------
+            val confirmPasswordInteractionSource = remember { MutableInteractionSource() }
+            val isConfirmPasswordFocused by confirmPasswordInteractionSource.collectIsFocusedAsState()
+            val isConfirmPasswordError = hasInteractedConfirm && confirmPassword.isNotEmpty() && !isConfirmPasswordValid
+            
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = {
@@ -245,7 +266,12 @@ fun ChangePasswordScreen(
                 label = { Text("Confirm New Password") },
                 visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
-                    val tint = if (!hasInteractedConfirm || confirmPassword.isEmpty()) Gray400 else Blue500
+                    // Match eye icon color to border color
+                    val tint = when {
+                        isConfirmPasswordError -> Error
+                        isConfirmPasswordFocused -> Blue500
+                        else -> Gray300
+                    }
                     IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
                         Icon(
                             imageVector = if (confirmPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
@@ -261,11 +287,12 @@ fun ChangePasswordScreen(
                     focusedBorderColor = Blue500,
                     unfocusedBorderColor = Gray300
                 ),
-                isError = hasInteractedConfirm && confirmPassword.isNotEmpty() && !isConfirmPasswordValid,
+                isError = isConfirmPasswordError,
                 supportingText =
-                    if (hasInteractedConfirm && confirmPassword.isNotEmpty() && !isConfirmPasswordValid) {
+                    if (isConfirmPasswordError) {
                         { Text("Passwords do not match", color = Error) }
-                    } else null
+                    } else null,
+                interactionSource = confirmPasswordInteractionSource
                 )
             }
 
@@ -298,7 +325,7 @@ fun ChangePasswordScreen(
                 } else {
                     Text(
                         text = "Change Password",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = White
                     )
                 }

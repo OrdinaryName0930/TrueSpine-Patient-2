@@ -136,6 +136,8 @@ private fun getNotificationIcon(type: NotificationType): ImageVector {
     return when (type) {
         NotificationType.NEW_BOOKING -> Icons.Default.EventAvailable
         NotificationType.APPOINTMENT_CONFIRMED -> Icons.Default.CheckCircle
+        NotificationType.APPOINTMENT_APPROVED -> Icons.Default.CheckCircle
+        NotificationType.APPOINTMENT_REJECTED -> Icons.Default.Cancel
         NotificationType.APPOINTMENT_CANCELLED -> Icons.Default.Cancel
         NotificationType.APPOINTMENT_REMINDER -> Icons.Default.Alarm
         NotificationType.MESSAGE_RECEIVED -> Icons.Default.Message
@@ -152,6 +154,8 @@ private fun getNotificationIconBackground(type: NotificationType): Color {
     return when (type) {
         NotificationType.NEW_BOOKING -> Blue100
         NotificationType.APPOINTMENT_CONFIRMED -> Green100
+        NotificationType.APPOINTMENT_APPROVED -> Green100
+        NotificationType.APPOINTMENT_REJECTED -> Red100
         NotificationType.APPOINTMENT_CANCELLED -> Red100
         NotificationType.APPOINTMENT_REMINDER -> Orange100
         NotificationType.MESSAGE_RECEIVED -> Purple100
@@ -168,6 +172,8 @@ private fun getNotificationIconColor(type: NotificationType): Color {
     return when (type) {
         NotificationType.NEW_BOOKING -> Blue600
         NotificationType.APPOINTMENT_CONFIRMED -> Green600
+        NotificationType.APPOINTMENT_APPROVED -> Green600
+        NotificationType.APPOINTMENT_REJECTED -> Red600
         NotificationType.APPOINTMENT_CANCELLED -> Red600
         NotificationType.APPOINTMENT_REMINDER -> Orange600
         NotificationType.MESSAGE_RECEIVED -> Purple600
@@ -235,6 +241,13 @@ fun NotificationCardReadPreview() {
         )
     }
 }
+
+
+
+
+
+
+
 
 
 

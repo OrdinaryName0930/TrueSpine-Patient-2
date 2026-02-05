@@ -1,5 +1,6 @@
 package com.brightcare.patient.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -82,6 +83,10 @@ fun ForgotPasswordEmailScreen(
     var emailErrorMessage by remember { mutableStateOf("") }
     var hasInteractedEmail by remember { mutableStateOf(false) }
     
+    // Throttle countdown state
+    var showThrottleToast by remember { mutableStateOf(false) }
+    var throttleMessage by remember { mutableStateOf("") }
+    
     // Real-time email validation (like in SignUpForm)
     fun validateEmailRealTime(input: String) {
         val lowercased = input.lowercase()
@@ -120,7 +125,13 @@ fun ForgotPasswordEmailScreen(
     
     fun handleSendResetLink() {
         if (validateEmailForSubmission()) {
-            viewModel.sendResetLink(email)
+            val throttleResult = viewModel.sendResetLink(email)
+            if (!throttleResult.canSend) {
+                // Show countdown toast
+                showThrottleToast = true
+                throttleMessage = viewModel.getPasswordResetThrottleToastMessage(email)
+                Log.d("ForgotPasswordEmail", "Reset link throttled: ${throttleResult.remainingTimeFormatted}")
+            }
         }
     }
     
@@ -235,6 +246,88 @@ fun ForgotPasswordEmailScreen(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 20.dp)
         )
+        
+        // Real-time countdown toast for throttling - positioned at bottom
+        if (showThrottleToast) {
+            ThrottleCountdownToast(
+                email = email,
+                viewModel = viewModel,
+                onDismiss = { showThrottleToast = false },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 15.dp) // Above the regular toast
+            )
+        }
+    }
+}
+
+/**
+ * Throttle Countdown Toast - Shows real-time countdown for password reset throttling
+ */
+@Composable
+private fun ThrottleCountdownToast(
+    email: String,
+    viewModel: PatientForgotPasswordViewModel,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var throttleResult by remember { mutableStateOf(viewModel.getPasswordResetThrottleResult(email)) }
+    
+    // Update countdown every second
+    LaunchedEffect(email) {
+        while (!throttleResult.canSend) {
+            delay(1000) // Update every second
+            val newResult = viewModel.getPasswordResetThrottleResult(email)
+            throttleResult = newResult
+            if (newResult.canSend) {
+                onDismiss() // Auto-dismiss when throttle expires
+                break
+            }
+        }
+    }
+    
+    // Show the toast with countdown
+    if (!throttleResult.canSend) {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Please wait to send new password reset link",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Time remaining: ${throttleResult.remainingTimeFormatted}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+                
+                TextButton(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                ) {
+                    Text("Dismiss")
+                }
+            }
+        }
     }
 }
 

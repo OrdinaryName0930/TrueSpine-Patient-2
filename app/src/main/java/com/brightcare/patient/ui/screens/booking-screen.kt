@@ -37,6 +37,8 @@ import com.brightcare.patient.data.model.*
 import com.brightcare.patient.navigation.NavigationRoutes
 import com.brightcare.patient.ui.theme.*
 import com.brightcare.patient.ui.viewmodel.BookingViewModel
+import com.brightcare.patient.utils.DateUtils
+import com.brightcare.patient.ui.component.DateHeader
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
@@ -44,7 +46,6 @@ import java.util.*
 
 /**
  * Booking screen - Manage appointments and schedule
- * Screen para sa pag-manage ng appointments at schedule
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -68,6 +69,7 @@ fun BookingScreen(
     var isLoadingChiropractors by remember { mutableStateOf(false) }
     var appointmentToCancel by remember { mutableStateOf<Appointment?>(null) }
     var showCancelConfirmation by remember { mutableStateOf(false) }
+    var userInitiatedBooking by remember { mutableStateOf(false) }
     
     // Pull-to-refresh state
     var isRefreshing by remember { mutableStateOf(false) }
@@ -75,6 +77,9 @@ fun BookingScreen(
         refreshing = isRefreshing,
         onRefresh = {
             isRefreshing = true
+            // Clear any existing error messages
+            viewModel.clearError()
+            // Load appointments
             viewModel.loadUserAppointments()
         }
     )
@@ -95,15 +100,28 @@ fun BookingScreen(
         }
     }
     
+    // Group appointments by date with proper titles
+    val groupedAppointments = remember(filteredAppointments) {
+        DateUtils.groupAppointmentsByDate(filteredAppointments) { appointment ->
+            appointment.date
+        }
+    }
+    
     // Handle refresh state - stop refreshing when data is loaded or error occurs
-    LaunchedEffect(uiState.isLoading, uiState.errorMessage) {
-        if (!uiState.isLoading) {
-            isRefreshing = false
+    LaunchedEffect(uiState.isLoading, uiState.errorMessage, appointments) {
+        if (isRefreshing) {
+            // Stop refreshing when loading completes (success or error)
+            if (!uiState.isLoading) {
+                // Add a small delay to show the refresh indicator briefly
+                kotlinx.coroutines.delay(300)
+                isRefreshing = false
+            }
         }
     }
     
     // Handle profile validation when user tries to book
     fun handleBookAppointment() {
+        userInitiatedBooking = true
         viewModel.validateProfileForBooking()
     }
     
@@ -138,6 +156,10 @@ fun BookingScreen(
                             if (suffix.isNotBlank()) append(" $suffix")
                         }.trim().ifBlank { data["name"] as? String ?: "Unknown Doctor" }
                         
+                        // Get real rating and review count from Firestore
+                        val realRating = (data["rating"] as? Double) ?: 0.0
+                        val realReviewCount = (data["reviewCount"] as? Long)?.toInt() ?: 0
+                        
                         Chiropractor(
                             id = document.id,
                             name = fullName,
@@ -147,8 +169,8 @@ fun BookingScreen(
                             specialization = data["specialization"] as? String ?: "General Practice",
                             licenseNumber = data["prcLicenseNumber"] as? String ?: "",
                             experience = (data["yearsOfExperience"] as? Long)?.toInt() ?: 0,
-                            rating = 4.8, // Default rating
-                            reviewCount = 150, // Default review count
+                            rating = realRating, // Real rating from reviews
+                            reviewCount = realReviewCount, // Real review count from reviews
                             isAvailable = true,
                             location = "Philippines",
                             bio = data["about"] as? String ?: ""
@@ -172,13 +194,20 @@ fun BookingScreen(
         }
     }
     
-    // Initialize profile validation when screen loads
+    // Initialize and load appointments when screen loads (removed automatic profile validation)
     LaunchedEffect(Unit) {
-        viewModel.validateProfileForBooking()
+        viewModel.loadUserAppointments()
     }
     
-    // Handle successful profile validation - don't auto-navigate
-    // User can manually navigate to chiropractors after validation passes
+    // Handle successful profile validation - show chiropractor selection only if user initiated booking
+    LaunchedEffect(uiState.profileValidation.isValid, userInitiatedBooking) {
+        if (uiState.profileValidation.isValid && !uiState.showProfileIncompleteDialog && userInitiatedBooking) {
+            // Profile is valid, dialog is not showing, and user clicked the + button
+            showChiropractorSelection = true
+            loadChiropractors()
+            userInitiatedBooking = false // Reset the flag after showing the dialog
+        }
+    }
     
     // Show error messages
     uiState.errorMessage?.let { errorMessage ->
@@ -218,59 +247,27 @@ fun BookingScreen(
                         )
                     )
                     Text(
-                        text = "Manage your bookings\nPamahalaan ang inyong mga booking",
+                        text = "Manage your bookings",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = Gray600
                         )
                     )
                 }
                 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Book Appointment FAB
+                FloatingActionButton(
+                    onClick = { 
+                        // Always validate profile first when user clicks to book
+                        handleBookAppointment()
+                    },
+                    containerColor = Blue500,
+                    contentColor = White,
+                    modifier = Modifier.size(56.dp)
                 ) {
-                    // Reload Button
-                    IconButton(
-                        onClick = { 
-                            viewModel.loadUserAppointments()
-                        }
-                    ) {
-                        if (uiState.isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = Blue500,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Reload Appointments",
-                                tint = Blue500
-                            )
-                        }
-                    }
-                    
-                    // Book Appointment FAB
-                    FloatingActionButton(
-                        onClick = { 
-                            if (uiState.profileValidation.isValid) {
-                                // Profile is valid, show chiropractor selection
-                                showChiropractorSelection = true
-                                loadChiropractors()
-                            } else {
-                                // Validate profile first
-                                handleBookAppointment()
-                            }
-                        },
-                        containerColor = Blue500,
-                        contentColor = White,
-                        modifier = Modifier.size(56.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Book Appointment"
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Book Appointment"
+                    )
                 }
             }
         }
@@ -302,8 +299,6 @@ fun BookingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Content with pull-to-refresh
         Box(
             modifier = Modifier
@@ -329,57 +324,56 @@ fun BookingScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = when (selectedTab) {
-                            0 -> "No upcoming appointments\nWalang upcoming na appointments"
-                            1 -> "No past appointments\nWalang nakaraang appointments"
-                            else -> "No appointments yet\nWala pang appointments"
+                            0 -> "No upcoming appointments"
+                            1 -> "No past appointments"
+                            else -> "No appointments yet"
                         },
                         style = MaterialTheme.typography.titleMedium,
                         color = Gray600,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = { 
-                            if (uiState.profileValidation.isValid) {
-                                // Profile is valid, show chiropractor selection
-                                showChiropractorSelection = true
-                                loadChiropractors()
-                            } else {
-                                // Validate profile first
-                                handleBookAppointment()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Blue500)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Book Appointment")
-                    }
+                    Text(
+                        text = "Pull down to refresh your appointments",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Gray500,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                items(filteredAppointments) { appointment ->
-                    AppointmentCard(
-                        appointment = appointment,
-                        onCancelClick = {
-                            // Show cancel confirmation dialog
-                            appointmentToCancel = appointment
-                            showCancelConfirmation = true
-                        },
-                        onViewDetailsClick = {
-                            // Navigate to appointment details
-                            navController.navigate(NavigationRoutes.appointmentDetails(appointment.id))
-                        }
-                    )
+                groupedAppointments.forEach { dateGroup ->
+                    // Date header
+                    item(key = "header_${dateGroup.title}") {
+                        DateHeader(
+                            title = dateGroup.title,
+                            modifier = Modifier.padding(top = if (dateGroup == groupedAppointments.first()) 0.dp else 16.dp)
+                        )
+                    }
+                    
+                    // Appointments for this date
+                    items(
+                        items = dateGroup.appointments,
+                        key = { appointment -> appointment.id }
+                    ) { appointment ->
+                        AppointmentCard(
+                            appointment = appointment,
+                            onCancelClick = {
+                                // Show cancel confirmation dialog
+                                appointmentToCancel = appointment
+                                showCancelConfirmation = true
+                            },
+                            onViewDetailsClick = {
+                                // Navigate to appointment details
+                                navController.navigate(NavigationRoutes.appointmentDetails(appointment.id))
+                            }
+                        )
+                    }
                 }
                 
                 // Add bottom padding for FAB
@@ -401,17 +395,22 @@ fun BookingScreen(
     if (uiState.showProfileIncompleteDialog) {
         ProfileIncompleteDialog(
             profileValidation = uiState.profileValidation,
-            onDismiss = { viewModel.hideProfileIncompleteDialog() },
+            onDismiss = { 
+                viewModel.hideProfileIncompleteDialog()
+                userInitiatedBooking = false // Reset flag when dialog is dismissed
+            },
             onNavigateToPersonalDetails = {
                 viewModel.hideProfileIncompleteDialog()
+                userInitiatedBooking = false // Reset flag when navigating away
                 navController.navigate(NavigationRoutes.PERSONAL_DETAILS)
             },
             onNavigateToEmergencyContacts = {
                 viewModel.hideProfileIncompleteDialog()
+                userInitiatedBooking = false // Reset flag when navigating away
                 navController.navigate(NavigationRoutes.EMERGENCY_CONTACTS)
             },
             onProceedToBooking = {
-                // Re-validate profile before proceeding
+                // Re-validate profile before proceeding - keep userInitiatedBooking true
                 viewModel.hideProfileIncompleteDialog()
                 viewModel.validateProfileForBooking()
             }
@@ -437,9 +436,13 @@ fun BookingScreen(
         ChiropractorSelectionDialog(
             chiropractors = chiropractors,
             isLoading = isLoadingChiropractors,
-            onDismiss = { showChiropractorSelection = false },
+            onDismiss = { 
+                showChiropractorSelection = false
+                userInitiatedBooking = false // Reset flag when dialog is dismissed
+            },
             onChiropractorSelected = { chiropractor ->
                 showChiropractorSelection = false
+                userInitiatedBooking = false // Reset flag when chiropractor is selected
                 navController.navigate("book_appointment/${chiropractor.id}")
             }
         )
@@ -465,7 +468,6 @@ fun BookingScreen(
 
 /**
  * Profile Incomplete Dialog
- * Dialog para sa incomplete profile
  */
 @Composable
 private fun ProfileIncompleteDialog(
@@ -487,7 +489,7 @@ private fun ProfileIncompleteDialog(
         },
         title = {
             Text(
-                text = "Complete Your Profile\nKumpletuhin ang Profile",
+                text = "Complete Your Profile",
                 style = MaterialTheme.typography.titleLarge,
                 textAlign = TextAlign.Center
             )
@@ -518,7 +520,7 @@ private fun ProfileIncompleteDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Personal Details Required\nKailangan ang Personal Details",
+                                text = "Personal Details Required",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Red500
                             )
@@ -537,7 +539,7 @@ private fun ProfileIncompleteDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Emergency Contact Required\nKailangan ang Emergency Contact",
+                                text = "Emergency Contact Required",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Red500
                             )
@@ -587,7 +589,6 @@ private fun ProfileIncompleteDialog(
 
 /**
  * Appointment card component
- * Component ng appointment card
  */
 @Composable
 private fun AppointmentCard(
@@ -794,7 +795,6 @@ private fun AppointmentCard(
 
 /**
  * Chiropractor Selection Dialog
- * Dialog para sa pagpili ng chiropractor
  */
 @Composable
 private fun ChiropractorSelectionDialog(
@@ -823,7 +823,7 @@ private fun ChiropractorSelectionDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Select Chiropractor\nPumili ng Chiropractor",
+                        text = "Select Chiropractor",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = Blue500
@@ -864,7 +864,7 @@ private fun ChiropractorSelectionDialog(
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "No chiropractors available\nWalang available na chiropractors",
+                                text = "No chiropractors available",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Gray600,
                                 textAlign = TextAlign.Center
@@ -892,7 +892,6 @@ private fun ChiropractorSelectionDialog(
 
 /**
  * Chiropractor Selection Card
- * Card para sa pagpili ng chiropractor
  */
 @Composable
 private fun ChiropractorSelectionCard(
@@ -976,7 +975,6 @@ private fun ChiropractorSelectionCard(
 
 /**
  * Cancel Appointment Dialog
- * Dialog para sa pag-cancel ng appointment
  */
 @Composable
 private fun CancelAppointmentDialog(

@@ -103,7 +103,15 @@ fun NavigationFragment(
         ) {
             // Display actual screens based on current route
             when (currentRoute) {
-                "home" -> HomeScreen(navController = navController)
+                "home" -> HomeScreen(
+                    navController = navController,
+                    onNavigateToBooking = {
+                        onNavigationItemClick("booking")
+                    },
+                    onNavigateToTab = { route ->
+                        onNavigationItemClick(route)
+                    }
+                )
                 "chiro" -> ChiroScreen(navController = navController)
                 "booking" -> BookingScreen(
                     navController = navController,

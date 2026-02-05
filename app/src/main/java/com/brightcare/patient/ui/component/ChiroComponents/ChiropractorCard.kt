@@ -36,6 +36,7 @@ fun ChiropractorCard(
     chiropractor: ChiropractorInfo,
     onBookClick: () -> Unit,
     onViewProfileClick: () -> Unit,
+    onMessageClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -79,7 +80,7 @@ fun ChiropractorCard(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = "Chiropractor",
+                            text = "Professional Chiropractor",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 color = Blue500,
                                 fontWeight = FontWeight.Bold
@@ -157,43 +158,61 @@ fun ChiropractorCard(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Stars
-                        repeat(5) { index ->
+                        if (chiropractor.reviewCount > 0) {
+                            // Stars (only show if has reviews)
+                            repeat(5) { index ->
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = if (index < chiropractor.rating.toInt()) Orange500 else Gray300,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+
+                            // Rating number
+                            Text(
+                                text = "${chiropractor.rating}",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Gray900
+                                ),
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
+
+                            // Divider |
+                            Text(
+                                text = " | ",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = Gray600
+                                ),
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+
+                            // Reviews count (from Firestore data)
+                            Text(
+                                text = "${chiropractor.reviewCount} Reviews",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Gray400
+                                )
+                            )
+                        } else {
+                            // No reviews yet - show placeholder
                             Icon(
                                 imageVector = Icons.Default.Star,
                                 contentDescription = null,
-                                tint = if (index < chiropractor.rating.toInt()) Orange500 else Gray300,
+                                tint = Gray300,
                                 modifier = Modifier.size(14.dp)
                             )
-                        }
-
-                        // Rating number
-                        Text(
-                            text = "${chiropractor.rating}",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Gray900
-                            ),
-                            modifier = Modifier.padding(start = 6.dp)
-                        )
-
-                        // Divider |
-                        Text(
-                            text = " | ",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = Gray600
-                            ),
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        )
-
-                        // Reviews count (from Firestore data)
-                        Text(
-                            text = "${chiropractor.reviewCount} Reviews",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = Gray400
+                            Text(
+                                text = "No reviews yet",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Normal,
+                                    color = Gray400
+                                ),
+                                modifier = Modifier.padding(start = 6.dp)
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -204,7 +223,8 @@ fun ChiropractorCard(
             ChiropractorCardActions(
                 isAvailable = true, // Always available for booking
                 onBookClick = onBookClick,
-                onViewProfileClick = onViewProfileClick
+                onViewProfileClick = onViewProfileClick,
+                onMessageClick = onMessageClick
             )
         }
     }
@@ -215,42 +235,71 @@ private fun ChiropractorCardActions(
     isAvailable: Boolean,
     onBookClick: () -> Unit,
     onViewProfileClick: () -> Unit,
+    onMessageClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        modifier = modifier.fillMaxWidth()
     ) {
-
-        // Left: View Profile (Outlined)
-        OutlinedButton(
-            onClick = onViewProfileClick,
-            modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = Blue500,
-                containerColor = Color.Transparent
-            ),
-            border = BorderStroke(
-                width = 1.dp,
-                color = Blue500
-            ),
-            shape = RoundedCornerShape(12.dp),
-            contentPadding = PaddingValues(vertical = 14.dp)
+        // First Row: View Profile and Message buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "View Profile",
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontWeight = FontWeight.SemiBold
+            // Left: View Profile (Outlined)
+            OutlinedButton(
+                onClick = onViewProfileClick,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Blue500,
+                    containerColor = Color.Transparent
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = Blue500
+                ),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(vertical = 14.dp)
+            ) {
+                Text(
+                    text = "View Profile",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
                 )
-            )
+            }
+
+            // Right: Message (Outlined with same design as View Profile)
+            OutlinedButton(
+                onClick = onMessageClick,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Blue500,
+                    containerColor = Color.Transparent
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = Blue500
+                ),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(vertical = 14.dp)
+            ) {
+                Text(
+                    text = "Message",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            }
         }
 
-        // Right: Make Appointment (Primary)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Second Row: Book Now button (full width)
         Button(
             onClick = onBookClick,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             enabled = true, // Always enabled
             colors = ButtonDefaults.buttonColors(
                 containerColor = Blue500,
@@ -260,7 +309,7 @@ private fun ChiropractorCardActions(
             contentPadding = PaddingValues(vertical = 14.dp)
         ) {
             Text(
-                text = "Book Now", // Always show "Book Now"
+                text = "Book Now",
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontWeight = FontWeight.SemiBold
                 )
@@ -287,7 +336,8 @@ fun ChiropractorCardPreview() {
                 reviewCount = 45
             ),
             onBookClick = { },
-            onViewProfileClick = { }
+            onViewProfileClick = { },
+            onMessageClick = { }
         )
     }
 }

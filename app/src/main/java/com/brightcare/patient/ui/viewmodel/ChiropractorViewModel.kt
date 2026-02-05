@@ -3,6 +3,8 @@ package com.brightcare.patient.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brightcare.patient.data.repository.ChiropractorRepository
+import com.brightcare.patient.data.repository.ProfileValidationService
+import com.brightcare.patient.data.model.ProfileValidationResult
 import com.brightcare.patient.ui.component.chirocomponents.ChiropractorInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
@@ -17,7 +19,8 @@ import javax.inject.Inject
 @OptIn(FlowPreview::class)
 @HiltViewModel
 class ChiropractorViewModel @Inject constructor(
-    private val chiropractorRepository: ChiropractorRepository
+    private val chiropractorRepository: ChiropractorRepository,
+    private val profileValidationService: ProfileValidationService
 ) : ViewModel() {
     
     // UI State
@@ -48,6 +51,22 @@ class ChiropractorViewModel @Inject constructor(
     
     private val _showNearMeOnly = MutableStateFlow(false)
     val showNearMeOnly: StateFlow<Boolean> = _showNearMeOnly.asStateFlow()
+    
+    // Profile validation state
+    private val _profileValidation = MutableStateFlow(ProfileValidationResult())
+    val profileValidation: StateFlow<ProfileValidationResult> = _profileValidation.asStateFlow()
+    
+    private val _showProfileIncompleteDialog = MutableStateFlow(false)
+    val showProfileIncompleteDialog: StateFlow<Boolean> = _showProfileIncompleteDialog.asStateFlow()
+    
+    private val _isValidatingProfile = MutableStateFlow(false)
+    val isValidatingProfile: StateFlow<Boolean> = _isValidatingProfile.asStateFlow()
+    
+    private val _shouldNavigateToBooking = MutableStateFlow(false)
+    val shouldNavigateToBooking: StateFlow<Boolean> = _shouldNavigateToBooking.asStateFlow()
+    
+    private val _selectedChiropractorId = MutableStateFlow<String?>(null)
+    val selectedChiropractorId: StateFlow<String?> = _selectedChiropractorId.asStateFlow()
     
     init {
         loadChiropractors()
@@ -235,6 +254,64 @@ class ChiropractorViewModel @Inject constructor(
     fun refresh() {
         loadChiropractors()
     }
+    
+    /**
+     * Validate profile for booking
+     */
+    fun validateProfileForBooking(chiropractorId: String) {
+        viewModelScope.launch {
+            try {
+                _isValidatingProfile.value = true
+                
+                // Store the chiropractor ID for later use
+                _selectedChiropractorId.value = chiropractorId
+                
+                val validation = profileValidationService.validateProfileForBooking()
+                
+                _profileValidation.value = validation
+                _showProfileIncompleteDialog.value = !validation.isValid
+                
+                // Trigger navigation if profile is valid
+                if (validation.isValid) {
+                    _shouldNavigateToBooking.value = true
+                }
+                
+            } catch (e: Exception) {
+                _profileValidation.value = ProfileValidationResult(
+                    isValid = false,
+                    errorMessage = "Unable to validate profile. Please try again."
+                )
+                _showProfileIncompleteDialog.value = true
+            } finally {
+                _isValidatingProfile.value = false
+            }
+        }
+    }
+    
+    /**
+     * Hide profile incomplete dialog
+     */
+    fun hideProfileIncompleteDialog() {
+        _showProfileIncompleteDialog.value = false
+    }
+    
+    /**
+     * Re-validate profile for booking using stored chiropractor ID
+     */
+    fun revalidateProfileForBooking() {
+        val chiropractorId = _selectedChiropractorId.value
+        if (chiropractorId != null) {
+            validateProfileForBooking(chiropractorId)
+        }
+    }
+    
+    /**
+     * Clear navigation trigger
+     */
+    fun clearNavigationTrigger() {
+        _shouldNavigateToBooking.value = false
+        _selectedChiropractorId.value = null
+    }
 }
 
 /**
@@ -246,7 +323,10 @@ data class ChiropractorUiState(
     val errorMessage: String? = null,
     val searchQuery: String = "",
     val showAvailableOnly: Boolean = false,
-    val showNearMeOnly: Boolean = false
+    val showNearMeOnly: Boolean = false,
+    val profileValidation: ProfileValidationResult = ProfileValidationResult(),
+    val showProfileIncompleteDialog: Boolean = false,
+    val isValidatingProfile: Boolean = false
 )
 
 

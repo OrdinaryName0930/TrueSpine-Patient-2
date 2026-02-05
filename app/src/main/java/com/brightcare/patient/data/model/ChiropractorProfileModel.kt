@@ -56,6 +56,14 @@ data class ChiropractorProfileModel(
     @PropertyName("serviceHours")
     val serviceHours: String = "",
     
+    // Real rating fields from Firestore (updated when reviews are submitted)
+    // Totoong rating fields mula sa Firestore (na-update kapag may nag-submit ng review)
+    @PropertyName("rating")
+    val rating: Double = 0.0,
+    
+    @PropertyName("reviewCount")
+    val reviewCount: Int = 0,
+    
     @PropertyName("education")
     val education: Map<String, EducationItem> = emptyMap(),
     
@@ -170,6 +178,13 @@ data class OtherItem(
     @PropertyName("date")
     val date: String = ""
 )
+
+
+
+
+
+
+
 
 
 

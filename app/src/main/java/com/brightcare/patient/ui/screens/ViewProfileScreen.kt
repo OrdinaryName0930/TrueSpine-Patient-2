@@ -9,6 +9,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -36,12 +40,14 @@ import com.brightcare.patient.navigation.NavigationRoutes
 import com.brightcare.patient.ui.theme.*
 import com.brightcare.patient.ui.component.profile.*
 import com.brightcare.patient.ui.viewmodel.ViewProfileViewModel
+import java.text.SimpleDateFormat
+import java.util.*
 
 /**
  * View Profile Screen for displaying chiropractor profile information
  * Screen para sa pagpapakita ng profile information ng chiropractor
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun ViewProfileScreen(
     navController: NavController,
@@ -52,6 +58,28 @@ fun ViewProfileScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedTabIndex by viewModel.selectedTabIndex.collectAsStateWithLifecycle()
     val tabLoadingStates by viewModel.tabLoadingStates.collectAsStateWithLifecycle()
+    val profileValidation by viewModel.profileValidation.collectAsStateWithLifecycle()
+    val showProfileIncompleteDialog by viewModel.showProfileIncompleteDialog.collectAsStateWithLifecycle()
+    val isValidatingProfile by viewModel.isValidatingProfile.collectAsStateWithLifecycle()
+    val shouldNavigateToBooking by viewModel.shouldNavigateToBooking.collectAsStateWithLifecycle()
+    val reviews by viewModel.reviews.collectAsStateWithLifecycle()
+    
+    // Pull to refresh state
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.refreshProfile(chiropractorId)
+        }
+    )
+
+    // Handle refresh completion
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && isRefreshing) {
+            isRefreshing = false
+        }
+    }
     
     // Load chiropractor profile when screen loads
     LaunchedEffect(chiropractorId) {
@@ -61,12 +89,28 @@ fun ViewProfileScreen(
     // Load tab data when tab changes
     LaunchedEffect(selectedTabIndex, chiropractorId) {
         if (uiState.hasData) {
-            viewModel.loadTabData(chiropractorId, selectedTabIndex)
+            if (selectedTabIndex == 1) {
+                // Load reviews for Reviews tab
+                viewModel.loadReviews(chiropractorId)
+            } else {
+                viewModel.loadTabData(chiropractorId, selectedTabIndex)
+            }
+        }
+    }
+    
+    // Handle navigation trigger
+    LaunchedEffect(shouldNavigateToBooking) {
+        shouldNavigateToBooking?.let { chiropractorIdToBook ->
+            // Clear the trigger first to prevent multiple navigations
+            viewModel.clearNavigationTrigger()
+            // Navigate to booking with chiropractor ID
+            navController.navigate("book_appointment/$chiropractorIdToBook")
         }
     }
     
     val tabs = listOf(
         TabItem("Overview"),
+        TabItem("Reviews"),
         TabItem("Education"),
         TabItem("Experience"),
         TabItem("Credentials"),
@@ -75,12 +119,17 @@ fun ViewProfileScreen(
     
     val scrollState = rememberScrollState()
     
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(WhiteBg)
-            .verticalScroll(scrollState)
+            .pullRefresh(pullRefreshState)
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+        ) {
         // Header Row
         Row(
             modifier = Modifier
@@ -203,9 +252,8 @@ fun ViewProfileScreen(
                 ProfileHeader(
                     chiropractor = chiropractor,
                     onBookNowClick = {
-                        // Navigate to booking screen
-                        // Mag-navigate sa booking screen
-                        navController.navigate("book_appointment/$chiropractorId")
+                        // Validate profile before booking
+                        viewModel.validateProfileForBooking(chiropractorId)
                     }
                 )
                 
@@ -288,6 +336,16 @@ fun ViewProfileScreen(
                         when (selectedTabIndex) {
                             0 -> ScrollableOverviewTab(chiropractor)
                             1 -> {
+                                // Reviews Tab
+                                Log.d("ViewProfileScreen", "Reviews data count: ${reviews.size}")
+                                ScrollableReviewsTab(
+                                    reviews = reviews,
+                                    chiropractorRating = chiropractor.rating,
+                                    reviewCount = chiropractor.reviewCount,
+                                    isLoading = tabLoadingStates[5] ?: false
+                                )
+                            }
+                            2 -> {
                                 val educationList = chiropractor.education.values.toList()
                                 Log.d("ViewProfileScreen", "Education data count: ${educationList.size}")
                                 ScrollableEducationTab(
@@ -295,7 +353,7 @@ fun ViewProfileScreen(
                                     isLoading = tabLoadingStates[1] ?: false
                                 )
                             }
-                            2 -> {
+                            3 -> {
                                 val experienceList = chiropractor.experienceHistory.values.toList()
                                 Log.d("ViewProfileScreen", "Experience data count: ${experienceList.size}")
                                 ScrollableExperienceTab(
@@ -303,7 +361,7 @@ fun ViewProfileScreen(
                                     isLoading = tabLoadingStates[2] ?: false
                                 )
                             }
-                            3 -> {
+                            4 -> {
                                 val credentialsList = chiropractor.professionalCredentials.values.toList()
                                 Log.d("ViewProfileScreen", "Credentials data count: ${credentialsList.size}")
                                 ScrollableCredentialsTab(
@@ -311,7 +369,7 @@ fun ViewProfileScreen(
                                     isLoading = tabLoadingStates[3] ?: false
                                 )
                             }
-                            4 -> {
+                            5 -> {
                                 val othersList = chiropractor.others.values.toList()
                                 Log.d("ViewProfileScreen", "Others data count: ${othersList.size}")
                                 ScrollableOthersTab(
@@ -324,6 +382,37 @@ fun ViewProfileScreen(
                 }
             }
         }
+        }
+        
+        // Pull refresh indicator
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            backgroundColor = White,
+            contentColor = Blue500
+        )
+    }
+    
+    // Profile Incomplete Dialog
+    if (showProfileIncompleteDialog) {
+        ProfileIncompleteDialog(
+            profileValidation = profileValidation,
+            onDismiss = { viewModel.hideProfileIncompleteDialog() },
+            onNavigateToPersonalDetails = {
+                viewModel.hideProfileIncompleteDialog()
+                navController.navigate(NavigationRoutes.PERSONAL_DETAILS)
+            },
+            onNavigateToEmergencyContacts = {
+                viewModel.hideProfileIncompleteDialog()
+                navController.navigate(NavigationRoutes.EMERGENCY_CONTACTS)
+            },
+            onProceedToBooking = {
+                // Re-validate profile before proceeding
+                viewModel.hideProfileIncompleteDialog()
+                viewModel.validateProfileForBooking(chiropractorId)
+            }
+        )
     }
 }
 
@@ -348,15 +437,32 @@ private fun ProfileHeader(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Profile Image
-            AsyncImage(
-                model = chiropractor.profileImageUrl.ifEmpty { "https://via.placeholder.com/120" },
-                contentDescription = "Doctor Photo",
+            Box(
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
-                    .background(Gray200),
-                contentScale = ContentScale.Crop
-            )
+                    .background(Gray100),
+                contentAlignment = Alignment.Center
+            ) {
+                if (chiropractor.profileImageUrl.isNotEmpty()) {
+                    AsyncImage(
+                        model = chiropractor.profileImageUrl,
+                        contentDescription = "Doctor Photo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // Show initials when no profile image
+                    Text(
+                        text = chiropractor.name.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString(""),
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Blue500,
+                            fontSize = 36.sp
+                        )
+                    )
+                }
+            }
             
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -369,27 +475,6 @@ private fun ProfileHeader(
                 textAlign = TextAlign.Center
             )
             
-            // Service Hours
-            if (chiropractor.serviceHours.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .background(
-                            color = Blue50,
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = chiropractor.serviceHours,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Blue500,
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-            
             Spacer(modifier = Modifier.height(8.dp))
             
             // Years of Experience
@@ -399,6 +484,14 @@ private fun ProfileHeader(
                 color = Gray600,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Medium
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Rating Display
+            RatingDisplay(
+                rating = chiropractor.rating,
+                reviewCount = chiropractor.reviewCount
             )
             
             // PITAHC Accreditation Number
@@ -440,8 +533,8 @@ private fun ProfileHeader(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Book Now",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
@@ -521,13 +614,6 @@ private fun OverviewTab(chiropractor: ChiropractorProfileModel) {
                         label = "Phone",
                         value = chiropractor.contactNumber
                     )
-                    if (chiropractor.serviceHours.isNotEmpty()) {
-                        ContactItem(
-                            icon = Icons.Default.Schedule,
-                            label = "Service Hours",
-                            value = chiropractor.serviceHours
-                        )
-                    }
                 }
             }
         }
@@ -576,13 +662,6 @@ private fun ScrollableOverviewTab(chiropractor: ChiropractorProfileModel) {
                     label = "Phone",
                     value = chiropractor.contactNumber
                 )
-                if (chiropractor.serviceHours.isNotEmpty()) {
-                    ContactItem(
-                        icon = Icons.Default.Schedule,
-                        label = "Service Hours",
-                        value = chiropractor.serviceHours
-                    )
-                }
             }
         }
         
@@ -798,6 +877,333 @@ private fun InfoCard(
 }
 
 /**
+ * Rating Display component for ProfileHeader
+ * Component para sa pagpapakita ng rating sa ProfileHeader
+ */
+@Composable
+private fun RatingDisplay(
+    rating: Double,
+    reviewCount: Int
+) {
+    Surface(
+        color = if (reviewCount > 0) Orange50 else Gray100,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (reviewCount > 0) {
+                // Show stars based on rating
+                repeat(5) { index ->
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = if (index < rating.toInt()) Orange500 else Gray300,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Text(
+                    text = String.format("%.1f", rating),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Orange600
+                )
+                
+                Text(
+                    text = " • ",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Gray500
+                )
+                
+                Text(
+                    text = "$reviewCount reviews",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Gray600
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.StarBorder,
+                    contentDescription = null,
+                    tint = Gray400,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "No reviews yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Gray500
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Scrollable Reviews tab content
+ * Content ng Reviews tab na scrollable
+ */
+@Composable
+private fun ScrollableReviewsTab(
+    reviews: List<Review>,
+    chiropractorRating: Double,
+    reviewCount: Int,
+    isLoading: Boolean = false
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp, start = 12.dp, end = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Rating Summary Card
+        RatingSummaryCard(
+            rating = chiropractorRating,
+            reviewCount = reviewCount
+        )
+        
+        if (isLoading && reviews.isEmpty()) {
+            // Show loading state for empty data
+            repeat(3) {
+                LoadingCard()
+                if (it < 2) Spacer(modifier = Modifier.height(12.dp))
+            }
+        } else if (reviews.isEmpty()) {
+            EmptyStateCard(
+                icon = Icons.Default.RateReview,
+                title = "No Reviews Yet",
+                message = "This chiropractor hasn't received any reviews yet. Be the first to leave a review after your appointment!"
+            )
+        } else {
+            reviews.forEach { review ->
+                ReviewCard(review = review)
+            }
+        }
+        Spacer(modifier = Modifier.height(80.dp))
+    }
+}
+
+/**
+ * Rating Summary Card
+ * Card para sa summary ng rating
+ */
+@Composable
+private fun RatingSummaryCard(
+    rating: Double,
+    reviewCount: Int
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = Orange500,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Overall Rating",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Blue500
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            if (reviewCount > 0) {
+                // Large rating number
+                Text(
+                    text = String.format("%.1f", rating),
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Orange500
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Stars
+                Row {
+                    repeat(5) { index ->
+                        Icon(
+                            imageVector = if (index < rating.toInt()) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = null,
+                            tint = if (index < rating.toInt()) Orange500 else Gray300,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Based on $reviewCount review${if (reviewCount > 1) "s" else ""}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Gray600
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.StarBorder,
+                    contentDescription = null,
+                    tint = Gray400,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "No ratings yet",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Gray500,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "Wala pang mga rating",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Gray400
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Individual Review Card
+ * Card para sa indibidwal na review
+ */
+@Composable
+private fun ReviewCard(review: Review) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Header: Name and Date
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Avatar
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = CircleShape,
+                        color = Blue50
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (review.isAnonymous) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Anonymous",
+                                    tint = Blue500,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = review.clientName.take(1).uppercase(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Blue500
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column {
+                        Text(
+                            text = if (review.isAnonymous) "Anonymous" else review.clientName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Gray800
+                        )
+                        Text(
+                            text = formatReviewDate(review.createdAt),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Gray500
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Star Rating
+            Row {
+                repeat(5) { index ->
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = if (index < review.rating) Orange500 else Gray300,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "${review.rating}/5",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = Orange600
+                )
+            }
+            
+            // Comment
+            if (review.comment.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = review.comment,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Gray700
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Format review date
+ * I-format ang petsa ng review
+ */
+private fun formatReviewDate(timestamp: Long): String {
+    return try {
+        val date = Date(timestamp)
+        val now = Date()
+        val diff = now.time - timestamp
+        
+        when {
+            diff < 60 * 1000 -> "Just now"
+            diff < 60 * 60 * 1000 -> "${diff / (60 * 1000)} minutes ago"
+            diff < 24 * 60 * 60 * 1000 -> "${diff / (60 * 60 * 1000)} hours ago"
+            diff < 7 * 24 * 60 * 60 * 1000 -> "${diff / (24 * 60 * 60 * 1000)} days ago"
+            else -> SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(date)
+        }
+    } catch (e: Exception) {
+        "Unknown date"
+    }
+}
+
+/**
  * Tab item data class
  * Data class ng tab item
  */
@@ -909,6 +1315,127 @@ private fun LoadingCard() {
             )
         }
     }
+}
+
+/**
+ * Profile Incomplete Dialog
+ */
+@Composable
+private fun ProfileIncompleteDialog(
+    profileValidation: ProfileValidationResult,
+    onDismiss: () -> Unit,
+    onNavigateToPersonalDetails: () -> Unit,
+    onNavigateToEmergencyContacts: () -> Unit,
+    onProceedToBooking: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = Orange500,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Complete Your Profile",
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = profileValidation.errorMessage ?: "Please complete your profile to book appointments.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Show what's missing
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (!profileValidation.hasPersonalDetails) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = Red500,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Personal Details Required",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Red500
+                            )
+                        }
+                    }
+                    
+                    if (!profileValidation.hasEmergencyContact) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContactPhone,
+                                contentDescription = null,
+                                tint = Red500,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Emergency Contact Required",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Red500
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (profileValidation.isValid) {
+                TextButton(
+                    onClick = onProceedToBooking
+                ) {
+                    Text("Continue Booking")
+                }
+            }
+        },
+        dismissButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (!profileValidation.hasPersonalDetails) {
+                    TextButton(
+                        onClick = onNavigateToPersonalDetails
+                    ) {
+                        Text("Add Personal Details")
+                    }
+                }
+                
+                if (!profileValidation.hasEmergencyContact) {
+                    TextButton(
+                        onClick = onNavigateToEmergencyContacts
+                    ) {
+                        Text("Add Emergency Contact")
+                    }
+                }
+                
+                TextButton(
+                    onClick = onDismiss
+                ) {
+                    Text("Cancel")
+                }
+            }
+        }
+    )
 }
 
 @Preview(showBackground = true)

@@ -26,6 +26,7 @@ import com.brightcare.patient.ui.component.signup_component.TermsCheckbox
 import com.brightcare.patient.ui.viewmodel.CompleteProfileViewModel
 import com.brightcare.patient.ui.viewmodel.PatientSignInViewModel
 import com.brightcare.patient.navigation.navigateToHome
+import com.brightcare.patient.navigation.NavigationRoutes
 import com.brightcare.patient.ui.BrightCareToast
 import com.brightcare.patient.ui.rememberToastState
 import com.brightcare.patient.ui.showInfo
@@ -50,7 +51,8 @@ data class CompleteProfileFormState(
     val additionalAddress: String = "",
     
     // Profile Picture
-    val profilePictureUrl: String = "",
+    val profilePictureUri: String = "", // Local URI for new profile picture
+    val profilePictureUrl: String = "", // Firebase Storage URL after upload
     
     // ID Upload fields
     val idFrontImageUri: String = "",
@@ -295,11 +297,11 @@ fun CompleteYourProfileScreen(
             },
             onTermsClick = {
                 // Navigate to Terms and Conditions
-                navController.navigate("terms_and_conditions")
+                navController.navigate(NavigationRoutes.TERMS_AND_CONDITIONS)
             },
             onPrivacyClick = {
                 // Navigate to Privacy Policy (same screen for now)
-                navController.navigate("terms_and_conditions")
+                navController.navigate(NavigationRoutes.TERMS_AND_CONDITIONS)
             },
             isError = uiState.formState.isTermsError,
             modifier = Modifier.padding(start = 10.dp, end = 12.dp, bottom = 15.dp, top = 8.dp)
@@ -307,7 +309,7 @@ fun CompleteYourProfileScreen(
         
         // Save/Continue button (matching SignUp button style)
         CompleteProfileButton(
-            text = "Save & Continue",
+            text = if (uiState.isSaving) "Compressing & Uploading..." else "Save & Continue",
             onClick = {
                 if (!isFormValid) {
                     // Show validation errors for missing required fields

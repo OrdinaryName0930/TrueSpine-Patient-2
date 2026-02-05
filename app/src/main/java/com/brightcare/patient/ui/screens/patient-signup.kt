@@ -2,6 +2,7 @@ package com.brightcare.patient.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -9,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.font.FontWeight
@@ -302,23 +304,30 @@ fun PatientSignUpScreen(
             )
         }
 
-        // Social Login Buttons
-        Row(
+        // Social Login Buttons - Google centered, Facebook hidden but preserved
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
+            contentAlignment = Alignment.Center
         ) {
+            // Google button centered
             SocialIconButton(
                 provider = SocialProvider.GOOGLE,
                 onClick = { viewModel.signInWithGoogle(activity) },
                 modifier = Modifier.size(45.dp),
                 logoSize = 20
             )
+            
+            // Facebook button hidden but code preserved for future use (positioned outside layout flow)
             SocialIconButton(
                 provider = SocialProvider.FACEBOOK,
                 onClick = { viewModel.signInWithFacebook(activity) },
-                modifier = Modifier.size(45.dp),
+                modifier = Modifier
+                    .size(45.dp)
+                    .alpha(0f) // Hide Facebook button while preserving functionality
+                    .offset(x = 100.dp), // Move out of the way but keep code intact
+                enabled = false, // Disable interaction while hidden
                 logoSize = 23
             )
         }

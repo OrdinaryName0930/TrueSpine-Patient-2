@@ -29,6 +29,7 @@ import com.brightcare.patient.ui.theme.*
 import com.brightcare.patient.ui.viewmodel.EmergencyContactViewModel
 import com.brightcare.patient.ui.component.complete_your_profile.CompleteProfileTextField
 import com.brightcare.patient.ui.component.complete_your_profile.CompleteProfileDropdown
+import com.brightcare.patient.ui.component.complete_your_profile.rememberAddressData
 import com.brightcare.patient.ui.BrightCareToast
 import com.brightcare.patient.ui.rememberToastState
 import com.brightcare.patient.ui.showInfo
@@ -41,9 +42,15 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 
 /**
- * Emergency Contact screen - Manage emergency contact information
- * Emergency Contact screen - Mag-manage ng emergency contact information
+ * Extension function to format display names
  */
+private fun String.toDisplayName(): String =
+    lowercase().split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+
+/**
+ * Emergency Contact screen - Manage emergency contact information
+ */
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun EmergencyContactScreen(
@@ -119,49 +126,30 @@ fun EmergencyContactScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                    onClick = { 
-                        navController.navigate("${NavigationRoutes.MAIN_DASHBOARD}?initialRoute=profile") {
-                            popUpTo(NavigationRoutes.MAIN_DASHBOARD) { inclusive = false }
-                        }
-                    }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Gray600
-                        )
-                    }
-                    
-                    Column {
-                        Text(
-                            text = "Emergency",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Blue500,
-                                fontSize = 28.sp
-                            )
-                        )
+                IconButton(
+                onClick = { 
+                    navController.navigate("${NavigationRoutes.MAIN_DASHBOARD}?initialRoute=profile") {
+                        popUpTo(NavigationRoutes.MAIN_DASHBOARD) { inclusive = false }
                     }
                 }
-                
-                // Add Contact Button
-                FloatingActionButton(
-                    onClick = { viewModel.showAddContactDialog() },
-                    containerColor = Blue500,
-                    contentColor = White,
-                    modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Emergency Contact",
-                        modifier = Modifier.size(24.dp)
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Gray600
+                    )
+                }
+                
+                Column {
+                    Text(
+                        text = "Emergency Contact",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Blue500,
+                            fontSize = 28.sp
+                        )
                     )
                 }
             }
@@ -187,10 +175,28 @@ fun EmergencyContactScreen(
                         errorMessage = uiState.errorMessage!!,
                         onRetry = { viewModel.loadEmergencyContacts() }
                     )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Add Contact Button below error card (if less than 3 contacts)
+                    if (uiState.emergencyContacts.size < 3) {
+                        AddContactButton(
+                            onClick = { viewModel.showAddContactDialog() }
+                        )
+                    }
                 }
                 uiState.emergencyContacts.isEmpty() -> {
                     // Empty state
                     EmptyStateCard()
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Add Contact Button below empty state card (if less than 3 contacts)
+                    if (uiState.emergencyContacts.size < 3) {
+                        AddContactButton(
+                            onClick = { viewModel.showAddContactDialog() }
+                        )
+                    }
                 }
                 else -> {
                     // Emergency Contacts List
@@ -201,6 +207,15 @@ fun EmergencyContactScreen(
                         onSetPrimaryClick = { contactId -> viewModel.setPrimaryContact(contactId) },
                         isDeleting = uiState.isDeleting
                     )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Add Contact Button below contacts list (if less than 3 contacts)
+                    if (uiState.emergencyContacts.size < 3) {
+                        AddContactButton(
+                            onClick = { viewModel.showAddContactDialog() }
+                        )
+                    }
                 }
             }
             
@@ -652,11 +667,11 @@ private fun EmergencyContactCard(
                     }
 
                     // Address (if present)
-                    if (contact.address.isNotBlank()) {
+                    if (contact.fullAddress.isNotBlank()) {
                         EnhancedContactDetailRow(
                             icon = Icons.Default.LocationOn,
                             label = "Address",
-                            value = contact.address,
+                            value = contact.fullAddress,
                             iconColor = Orange600,
                             iconBackgroundColor = Orange100,
                             isMultiLine = true
@@ -823,14 +838,57 @@ private fun AddEditContactDialog(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Name Section
+                    Text(
+                        text = "Name Information",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Gray900
+                        ),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                    
+                    // First Name
                     CompleteProfileTextField(
-                        value = formState.fullName,
+                        value = formState.firstName,
                         onValueChange = { value ->
-                            viewModel.updateFullName(value)
+                            viewModel.updateFirstName(value)
                         },
-                        placeholder = "*Full Name",
-                        isError = formState.isFullNameError,
-                        errorMessage = formState.fullNameErrorMessage
+                        placeholder = "*First Name",
+                        isError = formState.isFirstNameError,
+                        errorMessage = formState.firstNameErrorMessage
+                    )
+                    
+                    // Middle Name
+                    CompleteProfileTextField(
+                        value = formState.middleName,
+                        onValueChange = { value ->
+                            viewModel.updateMiddleName(value)
+                        },
+                        placeholder = "Middle Name (Optional)",
+                        isError = formState.isMiddleNameError,
+                        errorMessage = formState.middleNameErrorMessage
+                    )
+                    
+                    // Last Name
+                    CompleteProfileTextField(
+                        value = formState.lastName,
+                        onValueChange = { value ->
+                            viewModel.updateLastName(value)
+                        },
+                        placeholder = "*Last Name",
+                        isError = formState.isLastNameError,
+                        errorMessage = formState.lastNameErrorMessage
+                    )
+                    
+                    // Suffix
+                    CompleteProfileDropdown(
+                        value = formState.suffix,
+                        onValueChange = { value ->
+                            viewModel.updateSuffix(value)
+                        },
+                        placeholder = "Suffix (Optional)",
+                        options = listOf("Jr.", "Sr.", "II", "III", "IV", "V")
                     )
                     
                     CompleteProfileDropdown(
@@ -879,15 +937,88 @@ private fun AddEditContactDialog(
                         errorMessage = formState.emailErrorMessage
                     )
                     
+                    // Address Section
+                    Text(
+                        text = "Address Information",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Gray900
+                        ),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                    
+                    // Load address data for dropdowns
+                    val addressData = rememberAddressData()
+                    
+                    // Province list
+                    val provinces = addressData.provinces.map { it.toDisplayName() }
+                    val selectedProvinceKey = addressData.provinces.find { it.toDisplayName() == formState.province } ?: ""
+                    
+                    // Municipality list for selected province
+                    val municipalities = if (selectedProvinceKey.isNotEmpty()) {
+                        addressData.municipalities[selectedProvinceKey]?.map { it.toDisplayName() } ?: emptyList()
+                    } else emptyList()
+                    val selectedMunicipalityKey = addressData.municipalities[selectedProvinceKey]?.find { it.toDisplayName() == formState.municipality } ?: ""
+                    
+                    // Barangay list for selected province+municipality
+                    val barangays = if (selectedProvinceKey.isNotEmpty() && selectedMunicipalityKey.isNotEmpty()) {
+                        addressData.barangays["$selectedProvinceKey-$selectedMunicipalityKey"]?.map { it.toDisplayName() } ?: emptyList()
+                    } else emptyList()
+                    
+                    // Country field (read-only, default Philippines)
                     CompleteProfileTextField(
-                        value = formState.address,
+                        value = "Philippines",
+                        onValueChange = { }, // No-op since it's read-only
+                        placeholder = "Country",
+                        enabled = false
+                    )
+                    
+                    // Province dropdown
+                    CompleteProfileDropdown(
+                        value = formState.province,
                         onValueChange = { value ->
-                            viewModel.updateAddress(value)
+                            viewModel.updateProvince(value)
                         },
-                        placeholder = "Address (Optional)",
+                        placeholder = "Select Province (Optional)",
+                        options = provinces,
+                        isError = formState.isProvinceError,
+                        errorMessage = formState.provinceErrorMessage
+                    )
+                    
+                    // Municipality dropdown
+                    CompleteProfileDropdown(
+                        value = formState.municipality,
+                        onValueChange = { value ->
+                            viewModel.updateMunicipality(value)
+                        },
+                        placeholder = "Select Municipality (Optional)",
+                        options = municipalities,
+                        isError = formState.isMunicipalityError,
+                        errorMessage = formState.municipalityErrorMessage
+                    )
+                    
+                    // Barangay dropdown
+                    CompleteProfileDropdown(
+                        value = formState.barangay,
+                        onValueChange = { value ->
+                            viewModel.updateBarangay(value)
+                        },
+                        placeholder = "Select Barangay (Optional)",
+                        options = barangays,
+                        isError = formState.isBarangayError,
+                        errorMessage = formState.barangayErrorMessage
+                    )
+                    
+                    // Additional Address
+                    CompleteProfileTextField(
+                        value = formState.additionalAddress,
+                        onValueChange = { value ->
+                            viewModel.updateAdditionalAddress(value)
+                        },
+                        placeholder = "Additional Address (Optional)",
                         singleLine = false,
-                        isError = formState.isAddressError,
-                        errorMessage = formState.addressErrorMessage
+                        isError = formState.isAdditionalAddressError,
+                        errorMessage = formState.additionalAddressErrorMessage
                     )
                     
                     // Primary contact checkbox
@@ -975,103 +1106,107 @@ private fun DeleteConfirmationDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = Red500,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Delete Contact",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Gray900
-                    )
-                )
-            }
+            Text(
+                text = "Delete Contact",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Blue500
+            )
         },
         text = {
             Column {
                 Text(
                     text = "Are you sure you want to delete this emergency contact?",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        color = Gray800
-                    )
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Gray700
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Red50
-                ) {
-                    Text(
-                        text = contactName,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Red700
-                        ),
-                        modifier = Modifier.padding(12.dp)
+                Text(
+                    text = "\"$contactName\"",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Gray700
                     )
-                }
+                )
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
                     text = "This action cannot be undone.",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = Red600,
-                        fontWeight = FontWeight.Medium
-                    )
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Red700
                 )
             }
         },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                enabled = !isDeleting,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Red500,
-                    contentColor = White,
-                    disabledContainerColor = Gray300,
-                    disabledContentColor = Gray600
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                if (isDeleting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = White,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(
-                    text = if (isDeleting) "Deleting..." else "Delete",
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
+                confirmButton = {
+                    TextButton(
+                        onClick = onConfirm,
+                        enabled = !isDeleting,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Error
+                        )
+                    ) {
+                        if (isDeleting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Error,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(if (isDeleting) "Deleting..." else "Delete")
+                    }
+                },
         dismissButton = {
-            OutlinedButton(
+            TextButton(
                 onClick = onDismiss,
-                enabled = !isDeleting,
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = "Cancel",
-                    color = Gray600,
-                    fontWeight = FontWeight.Medium
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = Gray600
                 )
+            ) {
+                Text("Cancel")
             }
         },
-        containerColor = White,
-        shape = RoundedCornerShape(16.dp)
+        tonalElevation = 8.dp,
+        titleContentColor = Gray900,
+        textContentColor = Gray700
     )
+}
+
+@Composable
+private fun AddContactButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Blue500,
+            contentColor = White
+        ),
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(vertical = 16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Add Emergency Contact",
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontWeight = FontWeight.SemiBold
+                )
+            )
+        }
+    }
 }
 
 @Preview(

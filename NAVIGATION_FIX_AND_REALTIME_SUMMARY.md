@@ -152,3 +152,10 @@ Users can now successfully click on any chiropractor card and navigate to start 
 
 
 
+
+
+
+
+
+
+

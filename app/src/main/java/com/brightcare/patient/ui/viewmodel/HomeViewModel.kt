@@ -4,8 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brightcare.patient.data.model.Appointment
 import com.brightcare.patient.data.model.Notification
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import com.brightcare.patient.data.repository.BookingRepository
 import com.brightcare.patient.data.repository.NotificationRepository
+import com.brightcare.patient.data.repository.CompleteProfileRepository
+import com.brightcare.patient.data.repository.MessagingRepository
+import com.brightcare.patient.data.model.NotificationType
+import com.brightcare.patient.data.service.SimpleAppointmentMonitor
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -22,7 +30,10 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val bookingRepository: BookingRepository,
     private val notificationRepository: NotificationRepository,
-    private val firebaseAuth: FirebaseAuth
+    private val completeProfileRepository: CompleteProfileRepository,
+    private val messagingRepository: MessagingRepository,
+    private val firebaseAuth: FirebaseAuth,
+    private val simpleAppointmentMonitor: SimpleAppointmentMonitor
 ) : ViewModel() {
 
     // UI State
@@ -33,7 +44,7 @@ class HomeViewModel @Inject constructor(
     private val _todaysAppointments = MutableStateFlow<List<Appointment>>(emptyList())
     val todaysAppointments: StateFlow<List<Appointment>> = _todaysAppointments.asStateFlow()
 
-    // Upcoming appointments (next 7 days)
+    // All upcoming appointments (excluding today)
     private val _upcomingAppointments = MutableStateFlow<List<Appointment>>(emptyList())
     val upcomingAppointments: StateFlow<List<Appointment>> = _upcomingAppointments.asStateFlow()
 
@@ -48,6 +59,10 @@ class HomeViewModel @Inject constructor(
     // User's first name
     private val _userFirstName = MutableStateFlow<String?>(null)
     val userFirstName: StateFlow<String?> = _userFirstName.asStateFlow()
+
+    // User's profile picture URL
+    private val _userProfilePictureUrl = MutableStateFlow<String?>(null)
+    val userProfilePictureUrl: StateFlow<String?> = _userProfilePictureUrl.asStateFlow()
 
     // Loading states
     private val _isLoadingAppointments = MutableStateFlow(false)
@@ -65,11 +80,14 @@ class HomeViewModel @Inject constructor(
         loadAppointments()
         loadNotifications()
         observeNotifications()
+        
+        // Start monitoring appointment status changes
+        simpleAppointmentMonitor.startMonitoring()
     }
 
     /**
-     * Load user data including first name
-     * I-load ang user data kasama ang first name
+     * Load user data including first name and profile picture
+     * I-load ang user data kasama ang first name at profile picture
      */
     private fun loadUserData() {
         val currentUser = firebaseAuth.currentUser
@@ -82,6 +100,20 @@ class HomeViewModel @Inject constructor(
                 currentUser.email?.split("@")?.firstOrNull()?.capitalize() ?: "User"
             }
             _userFirstName.value = firstName
+            
+            // Load profile picture from Firestore
+            viewModelScope.launch {
+                try {
+                    val profileResult = completeProfileRepository.getProfileData()
+                    profileResult.onSuccess { profileData ->
+                        _userProfilePictureUrl.value = profileData?.profilePictureUrl
+                    }.onFailure {
+                        _userProfilePictureUrl.value = null
+                    }
+                } catch (e: Exception) {
+                    _userProfilePictureUrl.value = null
+                }
+            }
         }
     }
 
@@ -121,9 +153,6 @@ class HomeViewModel @Inject constructor(
      */
     private fun filterAppointments(appointments: List<Appointment>) {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        val calendar = Calendar.getInstance()
-        calendar.add(Calendar.DAY_OF_YEAR, 7) // Next 7 days
-        val nextWeek = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(calendar.time)
 
         // Filter today's appointments
         val todaysAppts = appointments.filter { appointment ->
@@ -131,12 +160,11 @@ class HomeViewModel @Inject constructor(
             (appointment.status == "pending" || appointment.status == "confirmed" || appointment.status == "approved")
         }
 
-        // Filter upcoming appointments (next 7 days, excluding today)
+        // Filter ALL upcoming appointments (excluding today) - no date limit
         val upcomingAppts = appointments.filter { appointment ->
-            appointment.date > today && 
-            appointment.date <= nextWeek &&
+            appointment.date > today &&
             (appointment.status == "pending" || appointment.status == "confirmed" || appointment.status == "approved")
-        }
+        }.sortedBy { it.date } // Sort by date to show nearest appointments first
 
         _todaysAppointments.value = todaysAppts
         _upcomingAppointments.value = upcomingAppts
@@ -251,11 +279,146 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
+     * Make phone call to chiropractor
+     * Tumawag sa chiropractor
+     */
+    fun makePhoneCall(context: Context, chiropractorId: String) {
+        viewModelScope.launch {
+            try {
+                val phoneResult = messagingRepository.getChiropractorPhoneNumber(chiropractorId)
+                
+                phoneResult.fold(
+                    onSuccess = { phoneNumber ->
+                        val intent = Intent(Intent.ACTION_CALL).apply {
+                            data = Uri.parse("tel:$phoneNumber")
+                        }
+                        context.startActivity(intent)
+                    },
+                    onFailure = { exception ->
+                        _errorMessage.value = exception.message ?: "Phone number not available"
+                    }
+                )
+            } catch (e: Exception) {
+                _errorMessage.value = e.message ?: "Failed to make phone call"
+            }
+        }
+    }
+
+    /**
      * Helper function to update UI state
      * Helper function para sa pag-update ng UI state
      */
     private fun updateUiState(update: (HomeUiState) -> HomeUiState) {
         _uiState.value = update(_uiState.value)
+    }
+    
+    /**
+     * Create a test notification for development/testing purposes
+     * Gumawa ng test notification para sa development/testing
+     */
+    fun createTestNotification() {
+        viewModelScope.launch {
+            try {
+                Log.d("HomeViewModel", "Creating test notification using NotificationRepository...")
+                
+                val result = notificationRepository.createNotification(
+                    title = "Test Notification 🔔",
+                    message = "This is a test notification created at ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())}. The notification system is working!",
+                    type = NotificationType.GENERAL
+                )
+                
+                result.fold(
+                    onSuccess = { notificationId ->
+                        Log.d("HomeViewModel", "Test notification created successfully: $notificationId")
+                        // Refresh notifications to show the new one
+                        loadNotifications()
+                    },
+                    onFailure = { exception ->
+                        Log.e("HomeViewModel", "Failed to create test notification", exception)
+                        _errorMessage.value = "Failed to create test notification: ${exception.message}"
+                    }
+                )
+                
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error creating test notification", e)
+                _errorMessage.value = "Error creating test notification: ${e.message}"
+            }
+        }
+    }
+    
+    /**
+     * Simulate appointment approval for testing
+     * I-simulate ang appointment approval para sa testing
+     */
+    fun simulateAppointmentApproval(appointmentId: String) {
+        viewModelScope.launch {
+            try {
+                Log.d("HomeViewModel", "Simulating appointment approval for: $appointmentId")
+                
+                // Update appointment status to approved
+                val updateData = mapOf(
+                    "status" to "approved",
+                    "updatedAt" to System.currentTimeMillis() / 1000
+                )
+                
+                firebaseAuth.currentUser?.let { user ->
+                    val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    firestore.collection("appointment")
+                        .document(appointmentId)
+                        .update(updateData)
+                        .addOnSuccessListener {
+                            Log.d("HomeViewModel", "Appointment status updated to approved")
+                        }
+                        .addOnFailureListener { exception ->
+                            Log.e("HomeViewModel", "Failed to update appointment status", exception)
+                        }
+                }
+                
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error simulating appointment approval", e)
+            }
+        }
+    }
+    
+    /**
+     * Simulate appointment rejection for testing
+     * I-simulate ang appointment rejection para sa testing
+     */
+    fun simulateAppointmentRejection(appointmentId: String) {
+        viewModelScope.launch {
+            try {
+                Log.d("HomeViewModel", "Simulating appointment rejection for: $appointmentId")
+                
+                // Update appointment status to rejected
+                val updateData = mapOf(
+                    "status" to "rejected",
+                    "message" to "Unfortunately, this time slot is no longer available. Please book another time.",
+                    "updatedAt" to System.currentTimeMillis() / 1000
+                )
+                
+                firebaseAuth.currentUser?.let { user ->
+                    val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    firestore.collection("appointment")
+                        .document(appointmentId)
+                        .update(updateData)
+                        .addOnSuccessListener {
+                            Log.d("HomeViewModel", "Appointment status updated to rejected")
+                        }
+                        .addOnFailureListener { exception ->
+                            Log.e("HomeViewModel", "Failed to update appointment status", exception)
+                        }
+                }
+                
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error simulating appointment rejection", e)
+            }
+        }
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        // Stop monitoring when ViewModel is cleared
+        simpleAppointmentMonitor.stopMonitoring()
     }
 }
 
@@ -272,6 +435,13 @@ data class HomeUiState(
     val isLoadingNotifications: Boolean = false,
     val errorMessage: String? = null
 )
+
+
+
+
+
+
+
 
 
 
